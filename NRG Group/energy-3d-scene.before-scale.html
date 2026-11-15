@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#03060e">
+  <title>Энергосцена — 3D scroll demo</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: #03060e; }
+    html { scrollbar-color: #6b82ab #080d17; }
+    body { overflow-x: hidden; }
+    .flight { position: relative; height: 900svh; }
+    .screen {
+      position: sticky; top: 0; width: 100%; height: 100svh; min-height: 0;
+      overflow: hidden; background: #03060e; isolation: isolate;
+    }
+    .screen::after {
+      content: ""; position: absolute; z-index: 1; inset: 0; pointer-events: none;
+      background: radial-gradient(ellipse at 50% 53%, transparent 30%, rgba(2,6,14,.04) 72%, rgba(2,6,14,.18) 100%);
+    }
+    canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+    @media (max-width: 700px) {
+      .screen { min-height: 0; }
+      .flight { height: 760svh; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="flight" aria-label="Интерактивная 3D-сцена энергопередачи">
+    <div class="screen">
+      <canvas id="scene" aria-label="Три электрических потока проходят через здания и включают свет"></canvas>
+    </div>
+  </main>
+  <script>
+    (function () {
+      "use strict";
+
+      var canvas = document.getElementById("scene");
+      var ctx = canvas.getContext("2d", { alpha: false });
+      var width = 0;
+      var height = 0;
+      var dpr = 1;
+      var focal = 600;
+      var scrollProgress = 0;
+      var cameraZ = 18;
+      var cameraX = 0;
+      var cameraY = 2.6;
+      var cameraForward = [0,0,-1];
+      var cameraRight = [1,0,0];
+      var cameraUp = [0,1,0];
+      var backgroundLightness = 0;
+      var skyLayer=document.createElement("canvas"),skyContext=skyLayer.getContext("2d");
+      var cameraTrack;
+      var cameraTrackLength = 0;
+      var cameraTrackDistances = [];
+      var cameraPosition = [0,0,0];
+      var cameraTarget = [0,0,0];
+      var previousTarget = [0,0,0];
+      var lastFrame = 0;
+      var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      function point(x, y, z) { return [x, y, z]; }
+
+function sampleCurve(controlPoints, samplesPerLeg) {
+        var out = [];
+        for (var i=0;i<controlPoints.length-1;i++) {
+          var p0=controlPoints[Math.max(0,i-1)], p1=controlPoints[i];
+          var p2=controlPoints[i+1], p3=controlPoints[Math.min(controlPoints.length-1,i+2)];
+          for (var j=0;j<samplesPerLeg;j++) {
+            var t=j/samplesPerLeg, t2=t*t, t3=t2*t;
+            var x=.5*(2*p1[0]+(-p0[0]+p2[0])*t+(2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*t2+(-p0[0]+3*p1[0]-3*p2[0]+p3[0])*t3);
+            var y=.5*(2*p1[1]+(-p0[1]+p2[1])*t+(2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*t2+(-p0[1]+3*p1[1]-3*p2[1]+p3[1])*t3);
+            var z=.5*(2*p1[2]+(-p0[2]+p2[2])*t+(2*p0[2]-5*p1[2]+4*p2[2]-p3[2])*t2+(-p0[2]+3*p1[2]-3*p2[2]+p3[2])*t3);
+            out.push(point(x,y,z));
+          }
+        }
+        out.push(controlPoints[controlPoints.length-1]);
+        return out;
+      }
+
+      const stops = [
+        {front:-19, back:-25, left:-30,right:-12, socket:[-18,1.35,-19], kind:0},
+        {front:-49, back:-57, left:3,right:15, socket:[9,1.35,-49], kind:1},
+        {front:-81,back:-90,left:-25,right:-7,socket:[-13,1.35,-81],kind:0},
+        {front:-114,back:-124,left:2,right:17,socket:[8,1.35,-114],kind:1}
+      ];
+      const route = sampleCurve([
+        [0,2.8,6],[0,2.5,3],[0,2,-5],[-8,1.5,-13],stops[0].socket,
+        [-16,1.35,-21.4],[-13,1.35,-22.4],[-12,1.65,-25],[-8,2.5,-33],
+        [4,2,-40],[9,1.35,-46],stops[1].socket,[8,1.35,-51],
+        [3,1.35,-53],[0,1.65,-55],[-2,2.1,-61],[0,2.8,-68],[-9,1.5,-76],stops[2].socket,[-12,1.35,-84],[-8,1.7,-89],[0,2.4,-99],[8,1.35,-110],stops[3].socket,[7,1.35,-118],[0,2,-126],[0,3,-143]
+      ],36);      function at(i){i=Math.max(0,Math.min(route.length-1,i));var k=Math.floor(i),a=route[k],b=route[Math.min(k+1,route.length-1)];return a.map((v,j)=>v+(b[j]-v)*(i-k))}
+      function camera(i){
+        var head=at(i), rear=at(i-38);
+        cameraX=head[0]*.88; cameraY=5.8+Math.min(3,head[1]*.18); cameraZ=head[2]+22;
+        function unit(v){var l=Math.hypot(...v)||1;return v.map(n=>n/l)}
+        cameraForward=unit([head[0]-cameraX,head[1]+.7-cameraY,head[2]-3-cameraZ]);
+        var f=cameraForward,r=cameraRight=unit([-f[2],0,f[0]]);
+        cameraUp=[-r[2]*f[1],r[2]*f[0]-r[0]*f[2],r[0]*f[1]];
+      }
+      var scratchA={x:0,y:0,scale:0,visible:false};
+      var scratchB={x:0,y:0,scale:0,visible:false};
+      var polyBuffer=[];
+      for(var pb=0;pb<24;pb++) polyBuffer.push({x:0,y:0,scale:0,visible:false});
+
+      function resize() {
+        var rect=canvas.getBoundingClientRect();
+        width=Math.max(1,rect.width); height=Math.max(1,rect.height);
+        dpr=Math.min(window.devicePixelRatio||1,2);
+        canvas.width=Math.round(width*dpr); canvas.height=Math.round(height*dpr);
+        skyLayer.width=canvas.width;skyLayer.height=canvas.height;
+        ctx.setTransform(dpr,0,0,dpr,0,0);
+        focal=Math.min(width,height)*1.04;
+        render(performance.now()/1000);
+      }
+
+      function projectInto(x,y,z,out) {
+        var dx=x-cameraX, dy=y-cameraY, dz=z-cameraZ;
+        var vx=dx*cameraRight[0]+dy*cameraRight[1]+dz*cameraRight[2];
+        var vy=dx*cameraUp[0]+dy*cameraUp[1]+dz*cameraUp[2];
+        var depth=dx*cameraForward[0]+dy*cameraForward[1]+dz*cameraForward[2];
+        if(depth<=1.6) { out.visible=false; return out; }
+        var s=focal/depth;
+        out.x=width*.5+vx*s;
+        out.y=height*.51-vy*s;
+        out.scale=s; out.visible=true;
+        return out;
+      }
+
+      function strokePath3D(points,color,alpha,lineWidth,dash,dashOffset) {
+        if(points.length<2) return;
+        ctx.save();
+        ctx.globalAlpha=alpha;
+        ctx.strokeStyle=color;
+        ctx.lineWidth=lineWidth;
+        ctx.lineCap="round"; ctx.lineJoin="round";
+        ctx.setLineDash(dash||[]);
+        ctx.lineDashOffset=dashOffset||0;
+        ctx.beginPath();
+        var open=false;
+        for(var i=0;i<points.length;i++) {
+          var p=projectInto(points[i][0],points[i][1],points[i][2],i%2===0?scratchA:scratchB);
+          if(!p.visible) { open=false; continue; }
+          if(!open) { ctx.moveTo(p.x,p.y); open=true; } else ctx.lineTo(p.x,p.y);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function strokeRange3D(points,start,end,color,alpha,lineWidth) {
+        if(end-start<1) return;
+        ctx.save();
+        ctx.globalAlpha=alpha; ctx.strokeStyle=color; ctx.lineWidth=lineWidth;
+        ctx.lineCap="round"; ctx.lineJoin="round";
+        ctx.shadowColor=color; ctx.shadowBlur=18;
+        ctx.beginPath();
+        var open=false;
+        for(var i=Math.max(0,start);i<=Math.min(points.length-1,end);i++) {
+          var p=projectInto(points[i][0],points[i][1],points[i][2],i%2===0?scratchA:scratchB);
+          if(!p.visible) { open=false; continue; }
+          if(!open) { ctx.moveTo(p.x,p.y); open=true; } else ctx.lineTo(p.x,p.y);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function fillPolygon3D(points,fill,stroke,alpha) {
+        if(points.length<3) return;
+        for(var i=0;i<points.length;i++) {
+          var p=projectInto(points[i][0],points[i][1],points[i][2],polyBuffer[i]);
+          if(!p.visible) return;
+        }
+        ctx.save(); ctx.globalAlpha=alpha===undefined?1:alpha;
+        ctx.beginPath(); ctx.moveTo(polyBuffer[0].x,polyBuffer[0].y);
+        for(var j=1;j<points.length;j++) ctx.lineTo(polyBuffer[j].x,polyBuffer[j].y);
+        ctx.closePath();
+        if(fill) { ctx.fillStyle=fill; ctx.fill(); }
+        if(stroke) { ctx.strokeStyle=stroke; ctx.lineWidth=1; ctx.stroke(); }
+        ctx.restore();
+      }
+
+      function wrappedDistance(a,b) {
+        var d=Math.abs(a-b);
+        return Math.min(d,1-d);
+      }
+
+      function pulsePhase(index,time) {
+        return (time*.018+scrollProgress*.92+index*.105)%1;
+      }
+
+      function signalAt(route,at,time) {
+        var distance=wrappedDistance(pulsePhase(route,time),at);
+        return Math.max(0,1-distance/.105);
+      }
+
+      var backgroundPalette=[
+        {at:0,color:[2,3,6]}, {at:.14,color:[3,6,12]},
+        {at:.4,color:[53,112,189]}, {at:.62,color:[159,198,234]},
+        {at:.84,color:[243,248,253]}, {at:1,color:[252,253,255]}
+      ];
+      function smoothstep(t) {
+        t=Math.max(0,Math.min(1,t));
+        return t*t*(3-2*t);
+      }
+
+      function mixColor(a,b,t) {
+        return [
+          Math.round(a[0]+(b[0]-a[0])*t),
+          Math.round(a[1]+(b[1]-a[1])*t),
+          Math.round(a[2]+(b[2]-a[2])*t)
+        ];
+      }
+
+      function parseColor(hex) {
+        return [parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];
+      }
+
+      function rgb(color,alpha) {
+        return alpha===undefined?"rgb("+color.join(",")+")":"rgba("+color.join(",")+","+alpha+")";
+      }
+
+      function backgroundColor(progress) {
+        var index=0;
+        while(index<backgroundPalette.length-2&&backgroundPalette[index+1].at<progress) index++;
+        var a=backgroundPalette[index],b=backgroundPalette[index+1];
+        var t=smoothstep((progress-a.at)/(b.at-a.at));
+        return mixColor(a.color,b.color,t);
+      }
+
+      function drawBackground() {
+        var color=backgroundColor(scrollProgress);
+        var luminance=color[0]*.2126+color[1]*.7152+color[2]*.0722;
+        backgroundLightness=smoothstep((luminance-42)/170);
+        // The whole scene changes exposure together; there is no travelling dividing line.
+        ctx.fillStyle=rgb(color);ctx.fillRect(0,0,width,height);
+        var strength=Math.sin(Math.PI*scrollProgress)*.12;
+        var halo=ctx.createRadialGradient(width*.68,height*.34,0,width*.68,height*.34,Math.max(width,height)*.95);
+        halo.addColorStop(0,rgb(mixColor(color,[211,233,252],strength)));
+        halo.addColorStop(1,rgb(color));
+        ctx.fillStyle=halo;ctx.fillRect(0,0,width,height);
+      }
+      function maskArchitecture(points){
+        var projected=points.map(p=>projectInto(...p,{})).filter(p=>p.visible).sort((a,b)=>a.x-b.x||a.y-b.y);
+        if(projected.length<3)return;
+        function cross(o,a,b){return (a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x)}
+        var lower=[],upper=[];
+        projected.forEach(function(p){while(lower.length>1&&cross(lower[lower.length-2],lower[lower.length-1],p)<=0)lower.pop();lower.push(p)});
+        projected.slice().reverse().forEach(function(p){while(upper.length>1&&cross(upper[upper.length-2],upper[upper.length-1],p)<=0)upper.pop();upper.push(p)});
+        var hull=lower.slice(0,-1).concat(upper.slice(0,-1));
+        ctx.save();ctx.beginPath();ctx.moveTo(hull[0].x,hull[0].y);hull.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));ctx.closePath();ctx.clip();
+        ctx.drawImage(skyLayer,0,0,width,height);ctx.restore();
+      }
+      // Continuous streetscape: staggered architecture frames both sides of the journey.
+      var streetscape=[];
+      function routeCenter(z){
+        var nearest=route[0];
+        for(var j=1;j<route.length;j++)if(Math.abs(route[j][2]-z)<Math.abs(nearest[2]-z))nearest=route[j];
+        return nearest[0];
+      }
+      for(var block=0;block<12;block++)for(var side=-1;side<=1;side+=2){
+        var z=8-block*14.5+(side===1?-6.5:0),center=routeCenter(z);
+        var w=4.4+(block%3)*.85,depth=4.6+(block%3)*.7;
+        var corridor=[routeCenter(z+4),routeCenter(z),routeCenter(z-depth-4),routeCenter(z-22)*.88,routeCenter(z-depth-22)*.88];
+        var edge=side<0?Math.min(...corridor):Math.max(...corridor);
+        var x=edge+side*(7+w*.5+(block%2)*.8);
+        var h=7+(block*5+(side===1?4:0))%10;
+        streetscape.push({x:x,z:z,w:w,depth:depth,h:h,side:side,variant:(block+(side===1?3:0))%6,seed:block*1.37+side});
+      }
+      function makeArchitecture(building){
+        var faces=[],x=building.x,z=building.z,w=building.w,d=building.depth,h=building.h;
+        function prism(footprint,y0,tops,detail){
+          if(typeof tops==='number')tops=footprint.map(()=>tops);
+          var bottom=footprint.map(p=>[x+p[0],y0,z+p[1]]),top=footprint.map((p,i)=>[x+p[0],tops[i],z+p[1]]);
+          var centre=[x+footprint.reduce((n,p)=>n+p[0],0)/footprint.length,(y0+Math.max(...tops))*.5,z+footprint.reduce((n,p)=>n+p[1],0)/footprint.length];
+          function face(points,windows){
+            var u=points[1].map((v,i)=>v-points[0][i]),v=points[2].map((v,i)=>v-points[0][i]);
+            var normal=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
+            var mid=points.reduce((sum,p)=>sum.map((n,i)=>n+p[i]/points.length),[0,0,0]);
+            if(normal.reduce((n,v,i)=>n+v*(mid[i]-centre[i]),0)<0)normal=normal.map(v=>-v);
+            faces.push({points:points,normal:normal,mid:mid,windows:windows||[]});
+          }
+          for(var i=0;i<footprint.length;i++){
+            var j=(i+1)%footprint.length,points=[bottom[i],bottom[j],top[j],top[i]],windows=[];
+            var span=Math.hypot(bottom[j][0]-bottom[i][0],bottom[j][2]-bottom[i][2]);
+            if(detail&&span>.55){
+              var rows=Math.max(1,Math.floor((Math.min(tops[i],tops[j])-y0-.7)/1.65));
+              var cols=Math.max(1,Math.floor(span/(building.variant===4?1.1:1.45)));
+              for(var row=0;row<rows;row++)for(var col=0;col<cols;col++){
+                var t0=(col+.23)/cols,t1=(col+.77)/cols;
+                var wy=y0+.6+row*(Math.min(tops[i],tops[j])-y0-.9)/rows,wh=(Math.min(tops[i],tops[j])-y0-.9)/rows*.51;
+                var ax=bottom[i][0]+(bottom[j][0]-bottom[i][0])*t0,az=bottom[i][2]+(bottom[j][2]-bottom[i][2])*t0;
+                var bx=bottom[i][0]+(bottom[j][0]-bottom[i][0])*t1,bz=bottom[i][2]+(bottom[j][2]-bottom[i][2])*t1;
+                windows.push({points:[[ax,wy,az],[bx,wy,bz],[bx,wy+wh,bz],[ax,wy+wh,az]],row:row,col:col});
+              }
+            }
+            face(points,windows);
+          }
+          face(top);
+        }
+        function box(l,r,b,t,front,back,detail=true){prism([[l,front],[r,front],[r,back],[l,back]],b,t,detail)}
+        if(building.variant===0){
+          // Terraced residential building: three real setbacks, not a box with a roof ornament.
+          box(-w*.5,w*.5,0,h*.46,0,-d);
+          box(-w*.5+.3,w*.28,h*.46,h*.78,-.45,-d+.3);
+          box(-w*.5+.7,w*.04,h*.78,h+1,-1,-d+.65);
+        }else if(building.variant===1){
+          // Slender tower with chamfered corners and a restrained sloping crown.
+          var r=w*.38,c=.65;
+          prism([[-r+c,0],[r-c,0],[r,-c],[r,-d+c],[r-c,-d],[-r+c,-d],[-r,-d+c],[-r,-c]],0,[h,h+1.5,h+1.5,h+1,h,h-.5,h-.5,h],true);
+          box(-r-.3,r+.3,0,1.1,.2,-d-.2,false);
+        }else if(building.variant===2){
+          // Low industrial pavilion with a flat clerestory and rooftop ventilation.
+          box(-w*.65,w*.65,0,h*.43,0,-d);
+          box(-w*.42,w*.36,h*.43,h*.43+.7,-1,-d+1,true);
+          for(var k=0;k<2;k++)box(-w*.3+k*w*.4,-w*.05+k*w*.4,h*.43+.7,h*.43+1.2,-1.6,-d+1.5,false);
+        }else if(building.variant===3){
+          // Two offset wings joined by a low podium.
+          box(-w*.58,w*.58,0,1.7,.2,-d,false);
+          box(-w*.55,-w*.04,1.7,h,-.15,-d*.72);
+          box(w*.08,w*.53,1.7,h*.73,-d*.2,-d);
+        }else if(building.variant===4){
+          // Rounded corner office: a faceted cylindrical footprint with continuous curved glazing.
+          var footprint=[];for(var k=0;k<14;k++){var angle=k/14*Math.PI*2;footprint.push([Math.cos(angle)*w*.52,-d*.5+Math.sin(angle)*d*.5])}
+          prism(footprint,0,h,true);
+          var crown=footprint.map(p=>[p[0]*.78,-d*.5+(p[1]+d*.5)*.78]);prism(crown,h,h+.65,false);
+        }else{
+          // Broad commercial block, recessed entrance volume and an asymmetric upper wing.
+          box(-w*.64,w*.64,0,h*.48,0,-d);
+          box(-w*.6,-w*.04,h*.48,h*.84,-d*.22,-d);
+          box(-w*.72,w*.69,1.35,1.55,.4,-.65,false);
+        }
+        return faces;
+      }
+      streetscape.forEach(b=>b.faces=makeArchitecture(b));
+      function drawStreetscape(head){
+        var time=reduceMotion?0:performance.now()*.00035;
+        var ordered=streetscape.slice().sort((a,b)=>a.z-b.z);
+        ordered.forEach(function(building){
+          var ahead=head[2]-building.z,grow=smoothstep((70-ahead)/36),leave=1-smoothstep((-ahead-2)/19);
+          if(grow<=0||leave<=0||building.z>cameraZ-4)return;
+          var visible=building.faces.filter(f=>f.normal[0]*(cameraX-f.mid[0])+f.normal[1]*(cameraY-f.mid[1])+f.normal[2]*(cameraZ-f.mid[2])>0);
+          visible.sort((a,b)=>{
+            function depth(f){return (f.mid[0]-cameraX)*cameraForward[0]+(f.mid[1]-cameraY)*cameraForward[1]+(f.mid[2]-cameraZ)*cameraForward[2]}
+            return depth(b)-depth(a);
+          });
+          var fade=(.27+.73*(1-smoothstep((ahead-8)/62)))*grow*leave;
+          visible.forEach(function(face,faceIndex){
+            var transform=p=>[p[0],p[1]*(.92+.08*grow),p[2]];
+            var points=face.points.map(transform);
+            var projected=points.map(p=>projectInto(...p,{}));if(projected.some(p=>!p.visible))return;
+            maskArchitecture(points);
+            fillPolygon3D(points,rgb([65,83,108],face.normal[1]>0?.025:.04),null,grow*leave);
+            var first=projected[0],last=projected[Math.floor(projected.length/2)];
+            var gradient=ctx.createLinearGradient(first.x,first.y,last.x+.1,last.y+.1);
+            var glint=.5+.5*Math.sin(time+building.seed+faceIndex*.4+scrollProgress*6);
+            var neutralBase=mixColor([172,181,194],[28,35,46],backgroundLightness);
+            var neutralGlint=mixColor([245,249,255],[65,76,91],backgroundLightness);
+            gradient.addColorStop(0,rgb(mixColor(neutralBase,neutralGlint,glint*.6)));
+            gradient.addColorStop(.5,rgb(neutralGlint));gradient.addColorStop(1,rgb(neutralBase));
+            ctx.save();ctx.globalCompositeOperation='source-over';
+            strokePath3D(points.concat([points[0]]),gradient,fade*.78,.72);
+            face.windows.forEach(function(pane){
+              var p=pane.points.map(transform),light=smoothstep((building.z-head[2]-.07*pane.row-.04*pane.col)/1.4);
+              if(light>0)fillPolygon3D(p,rgb(mixColor([231,241,255],[27,37,53],backgroundLightness),light*(.5+.12*(.5+.5*Math.sin(building.seed+pane.row*1.7+pane.col*2.3)))),null,grow*leave);
+              strokePath3D(p.concat([p[0]]),rgb(neutralBase),fade*.58,.4);
+            });
+            ctx.restore();
+          });
+        });
+      }
+      var lanes=[-1,0,1], colors=['#ff3848','#347fff','#ffffff'];
+      function draw(){
+        const i=scrollProgress*(route.length-1),head=at(i);
+        camera(i);drawBackground();skyContext.drawImage(canvas,0,0);drawStreetscape(head);
+        // Far-to-near order keeps the roof and facade silhouettes coherent.
+        // The four oversized flat elevations are omitted; the side buildings frame the open corridor.
+        lanes.forEach(function(lane,laneIndex){
+          var line=[];
+          // Constant-length luminous ribbons, with fractional endpoints: no disappearing pulses.
+          var start=i-88,end=i+4;
+          for(var k=start;k<end;k+=.65){
+            var v=at(k),spread=Math.min(1,...stops.map(stop=>Math.hypot(v[0]-stop.socket[0],v[2]-stop.front)/2.8));
+            if(k<0){v[1]+=(-k)*.035;v[2]+=(-k)*.12}
+            line.push([v[0]+lane*.34*spread,v[1]+lane*.12*spread,v[2]]);
+          }
+          var color=colors[laneIndex];
+          ctx.save();ctx.globalCompositeOperation='source-over';
+          strokePath3D(line,color,.07,17);strokePath3D(line,color,.17,7);
+          strokePath3D(line,color,1,2.3);strokePath3D(line,'#ffffff',.72,.65);
+          if(!reduceMotion){
+            var phase=(performance.now()*.00022+laneIndex*.29)%1;
+            var mark=Math.floor(phase*(line.length-12));
+            strokePath3D(line.slice(mark,mark+12),'#ffffff',.8,2.1);
+          }
+          ctx.restore();
+        });
+      }
+      function render(time) { draw(time); }
+
+      var target=0,raf=0;
+      function tick(){raf=0;scrollProgress+=(target-scrollProgress)*(reduceMotion?1:.14);if(Math.abs(target-scrollProgress)<.0001)scrollProgress=target;draw();if(target!==scrollProgress || (!document.hidden))raf=requestAnimationFrame(tick)}
+      function update(){target=Math.min(1,Math.max(0,scrollY/Math.max(1,document.documentElement.scrollHeight-innerHeight)));if(!raf)raf=requestAnimationFrame(tick)}
+      document.addEventListener("visibilitychange",update);addEventListener("scroll",update,{passive:true});addEventListener("resize",resize);resize();update();
+    })();
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
