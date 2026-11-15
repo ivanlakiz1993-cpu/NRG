@@ -463,14 +463,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               band.forEach(function(f,k){f.curvedEdges={1:band[(k+1)%32],3:band[(k+31)%32]};});
             }
           }
-          function coolingTower(cx,cz,height){
-            var profile=[[0,5.5],[2,5.1],[height*.48,3.35],[height*.85,4.1],[height,4.8]];
-            var rings=profile.map(p=>Array.from({length:32},(_,k)=>{var a=k/32*Math.PI*2;return [cx+Math.cos(a)*p[1],p[0],cz+Math.sin(a)*p[1]];}));
-            curvedSkin(rings,[cx,height*.5,cz]);
-            var outer=rings[rings.length-1],inner=outer.map(p=>[cx+(p[0]-cx)*.94,height-.35,cz+(p[2]-cz)*.94]);
-            for(var k=0;k<32;k++)surface([outer[k],outer[(k+1)%32],inner[(k+1)%32],inner[k]],[cx,height*.5,cz]);
-          }
-          coolingTower(0,116,24);coolingTower(-3,99,20);
           roundBox(-31,-17,0,6.4,60,46,1.7,true);
           for(var sx of [-30,-22,-14]){
             var foot=Array.from({length:32},(_,k)=>{var a=k/32*Math.PI*2;return [sx+Math.cos(a)*2.7,27+Math.sin(a)*2.7];});
@@ -768,17 +760,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               line([[sx,0,13],[sx,7,13],[sx-side*.35,7.6,13],[sx-side*1.8,7.6,13]],.55,.75);
               line([[sx-side*1.4,7.5,13],[sx-side*2.2,7.5,13]],.7,1.5);
             }
-          }
-          // Cooling-tower collars, inspection decks and diagonal lower supports.
-          for(var tower of [[0,116,24],[-3,99,20]]){
-            var tx=tower[0],tz=tower[1],th=tower[2];
-            for(var level of [[0,5.55],[2,5.15],[th*.48,3.4],[th*.85,4.15],[th,4.85],[th+.8,4.95]])ring(tx,level[0],tz,level[1],.2);
-            for(var k=0;k<16;k++){
-              var a=k/16*Math.PI*2,b=a+Math.PI/16;
-              line([[tx+Math.cos(a)*5.6,0,tz+Math.sin(a)*5.6],[tx+Math.cos(b)*5.15,2,tz+Math.sin(b)*5.15]],.22,.65);
-              line([[tx+Math.cos(a)*4.95,th,tz+Math.sin(a)*4.95],[tx+Math.cos(a)*4.95,th+.8,tz+Math.sin(a)*4.95]],.5,.45);
-            }
-            for(var dx of [-.22,.22])line([[tx+dx,0,tz+5.65],[tx+dx,th*.48,tz+3.48],[tx+dx,th,tz+4.88]],.4,.55);
           }
           // Silo seams and roof guards, with a common transfer conveyor behind the vessels.
           for(var sx of [-30,-22,-14]){
