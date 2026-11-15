@@ -17,7 +17,7 @@
     }
     .screen::after {
       content: ""; position: absolute; z-index: 1; inset: 0; pointer-events: none;
-      background: radial-gradient(ellipse at 50% 53%, transparent 30%, rgba(2,6,14,.04) 72%, rgba(2,6,14,.18) 100%);
+      background: radial-gradient(ellipse at 50% 53%, transparent 30%, rgba(2,6,14,.008) 72%, rgba(2,6,14,.025) 100%);
     }
     canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
     @media (max-width: 700px) {
@@ -129,10 +129,60 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var s=focal/depth;
         out.x=width*.5+vx*s;
         out.y=height*.51-vy*s;
-        out.scale=s; out.visible=true;
+        out.scale=s; out.depth=depth; out.visible=true;
         return out;
       }
 
+      // Shared reciprocal-depth buffer: every architectural stroke and ribbon uses it.
+      var depthBuffer=new Float32Array(0),depthWidth=0,depthHeight=0,depthScale=.5,depthKey='';
+      var strokeCache=new WeakMap();
+      function prepareDepth(queue){
+        var key=[width,height,cameraX,cameraY,cameraZ,queue.filter(e=>e.grow>=.38).map(e=>e.building.seed)].join();if(key===depthKey)return;depthKey=key;
+        depthWidth=Math.ceil(width*depthScale);depthHeight=Math.ceil(height*depthScale);
+        if(depthBuffer.length!==depthWidth*depthHeight)depthBuffer=new Float32Array(depthWidth*depthHeight);
+        else depthBuffer.fill(0);
+        queue.forEach(function(entry){
+          if(entry.grow<.38)return;
+          var vertices=clipPolygon(entry.face.points).map(p=>projectInto(...p,{}));
+          if(vertices.some(p=>!p.visible))return;
+          for(var j=1;j<vertices.length-1;j++)rasterTriangle(vertices[0],vertices[j],vertices[j+1]);
+        });
+      }
+      function rasterTriangle(a,b,c){
+        var ax=a.x*depthScale,ay=a.y*depthScale,bx=b.x*depthScale,by=b.y*depthScale,cx=c.x*depthScale,cy=c.y*depthScale;
+        var area=(by-cy)*(ax-cx)+(cx-bx)*(ay-cy);if(Math.abs(area)<.00001)return;
+        var left=Math.max(0,Math.floor(Math.min(ax,bx,cx))),right=Math.min(depthWidth-1,Math.ceil(Math.max(ax,bx,cx)));
+        var top=Math.max(0,Math.floor(Math.min(ay,by,cy))),bottom=Math.min(depthHeight-1,Math.ceil(Math.max(ay,by,cy)));
+        for(var y=top;y<=bottom;y++)for(var x=left;x<=right;x++){
+          var u=((by-cy)*(x+.5-cx)+(cx-bx)*(y+.5-cy))/area;
+          var v=((cy-ay)*(x+.5-cx)+(ax-cx)*(y+.5-cy))/area,w=1-u-v;
+          if(u<0||v<0||w<0)continue;
+          var inv=u/a.depth+v/b.depth+w/c.depth,index=y*depthWidth+x;
+          if(inv>depthBuffer[index])depthBuffer[index]=inv;
+        }
+      }
+      function visibleAt(x,y,inv){
+        var ix=Math.floor(x*depthScale),iy=Math.floor(y*depthScale);
+        if(ix<0||iy<0||ix>=depthWidth||iy>=depthHeight)return true;
+        // Small world-space bias keeps facade-mounted details on their own surface.
+        var nearest=depthBuffer[iy*depthWidth+ix];
+        // Conservative edge sampling prevents the half-resolution buffer from stippling thin lines.
+        for(var oy=-1;oy<=1;oy++)for(var ox=-1;ox<=1;ox++){
+          var nx=ix+ox,ny=iy+oy;
+          if(nx>=0&&ny>=0&&nx<depthWidth&&ny<depthHeight)nearest=Math.min(nearest,depthBuffer[ny*depthWidth+nx]);
+        }
+        return inv+.12*inv*inv+.00008>=nearest;
+      }
+      function worldDepth(p){return (p[0]-cameraX)*cameraForward[0]+(p[1]-cameraY)*cameraForward[1]+(p[2]-cameraZ)*cameraForward[2]}
+      function clipPolygon(points){
+        var result=[],near=1.61;
+        for(var i=0;i<points.length;i++){
+          var a=points[i],b=points[(i+1)%points.length],da=worldDepth(a),db=worldDepth(b);
+          if(da>=near)result.push(a);
+          if((da>=near)!==(db>=near)){var t=(near-da)/(db-da);result.push(a.map((v,j)=>v+(b[j]-v)*t));}
+        }
+        return result;
+      }
       function strokePath3D(points,color,alpha,lineWidth,dash,dashOffset) {
         if(points.length<2) return;
         ctx.save();
@@ -142,14 +192,32 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         ctx.lineCap="round"; ctx.lineJoin="round";
         ctx.setLineDash(dash||[]);
         ctx.lineDashOffset=dashOffset||0;
-        ctx.beginPath();
+        var trace=strokeCache.get(points);
+        if(trace){ctx.stroke(trace);ctx.restore();return;}
+        trace=new Path2D();strokeCache.set(points,trace);
         var open=false;
-        for(var i=0;i<points.length;i++) {
-          var p=projectInto(points[i][0],points[i][1],points[i][2],i%2===0?scratchA:scratchB);
-          if(!p.visible) { open=false; continue; }
-          if(!open) { ctx.moveTo(p.x,p.y); open=true; } else ctx.lineTo(p.x,p.y);
+        for(var i=1;i<points.length;i++){
+          var a=points[i-1],b=points[i],da=worldDepth(a),db=worldDepth(b);
+          if(da<1.61&&db<1.61){open=false;continue;}
+          if(da<1.61||db<1.61){var t=(1.61-da)/(db-da),cut=a.map((v,j)=>v+(b[j]-v)*t);if(da<1.61)a=cut;else b=cut;}
+          var previous=projectInto(...a,{}),p=projectInto(...b,{});
+          var dx=p.x-previous.x,dy=p.y-previous.y;
+          // Clip screen-space extent before sampling, including very near surfaces.
+          var lo=0,hi=1,valid=true;
+          for(var test of [[-dx,previous.x+2],[dx,width+2-previous.x],[-dy,previous.y+2],[dy,height+2-previous.y]]){
+            if(Math.abs(test[0])<1e-9){if(test[1]<0)valid=false;continue;}
+            var r=test[1]/test[0];if(test[0]<0)lo=Math.max(lo,r);else hi=Math.min(hi,r);
+          }
+          if(!valid||lo>hi){open=false;continue;}
+          var count=Math.max(1,Math.ceil(Math.hypot(dx,dy)*(hi-lo)/1.6));open=false;
+          for(var sample=0;sample<=count;sample++){
+            var t=lo+(hi-lo)*sample/count,x=previous.x+dx*t,y=previous.y+dy*t;
+            var inv=(1-t)/previous.depth+t/p.depth;
+            if(visibleAt(x,y,inv)){if(open)trace.lineTo(x,y);else{trace.moveTo(x,y);open=true;}}
+            else open=false;
+          }
         }
-        ctx.stroke();
+        ctx.stroke(trace);
         ctx.restore();
       }
 
@@ -171,6 +239,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       }
 
       function fillPolygon3D(points,fill,stroke,alpha) {
+        points=clipPolygon(points);
         if(points.length<3) return;
         for(var i=0;i<points.length;i++) {
           var p=projectInto(points[i][0],points[i][1],points[i][2],polyBuffer[i]);
@@ -200,9 +269,9 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       }
 
       var backgroundPalette=[
-        {at:0,color:[2,3,6]}, {at:.14,color:[3,6,12]},
-        {at:.4,color:[53,112,189]}, {at:.62,color:[159,198,234]},
-        {at:.84,color:[243,248,253]}, {at:1,color:[252,253,255]}
+        {at:0,color:[2,3,6]}, {at:.29,color:[2,3,6]},
+        {at:.33,color:[10,64,220]}, {at:.68,color:[10,64,220]},
+        {at:.72,color:[255,255,255]}, {at:1,color:[255,255,255]}
       ];
       function smoothstep(t) {
         t=Math.max(0,Math.min(1,t));
@@ -245,21 +314,21 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var desiredMix=smoothstep((contrastDelta+1.35)/2.7);
         var now=performance.now(),dt=lastContrastTime?Math.min(.1,(now-lastContrastTime)/1000):0;
         lastContrastTime=now;
-        contourMix+=(desiredMix-contourMix)*(reduceMotion?1:1-Math.exp(-dt/ .7));
+        contourMix+=(desiredMix-contourMix)*(reduceMotion?1:1-Math.exp(-dt/ .16));
         contourTransition=4*contourMix*(1-contourMix);
         contourBase=mixColor(light,dark,contourMix);
         contourGlint=mixColor([255,255,255],[2,8,18],contourMix);
         contourHalo=mixColor([1,6,14],[248,251,255],contourMix);
         // The whole scene changes exposure together; there is no travelling dividing line.
         ctx.fillStyle=rgb(color);ctx.fillRect(0,0,width,height);
-        var strength=Math.sin(Math.PI*scrollProgress)*.12;
+        var strength=(1-smoothstep((scrollProgress-.68)/.04))*.055;
         var halo=ctx.createRadialGradient(width*.68,height*.34,0,width*.68,height*.34,Math.max(width,height)*.95);
-        halo.addColorStop(0,rgb(mixColor(color,[211,233,252],strength)));
+        halo.addColorStop(0,rgb(mixColor(color,[0,0,0],strength)));
         halo.addColorStop(1,rgb(color));
         ctx.fillStyle=halo;ctx.fillRect(0,0,width,height);
       }
       function maskArchitecture(points){
-        var projected=points.map(p=>projectInto(...p,{})).filter(p=>p.visible).sort((a,b)=>a.x-b.x||a.y-b.y);
+        var projected=clipPolygon(points).map(p=>projectInto(...p,{})).filter(p=>p.visible).sort((a,b)=>a.x-b.x||a.y-b.y);
         if(projected.length<3)return;
         function cross(o,a,b){return (a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x)}
         var lower=[],upper=[];
@@ -373,7 +442,11 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         }
         return faces;
       }
-      streetscape.forEach(b=>b.faces=makeArchitecture(b));
+      streetscape.forEach(function(b){
+        b.faces=makeArchitecture(b);
+        var vertices=b.faces.flatMap(f=>f.points);
+        b.bounds={minX:Math.min(...vertices.map(p=>p[0])),maxX:Math.max(...vertices.map(p=>p[0])),minZ:Math.min(...vertices.map(p=>p[2])),maxZ:Math.max(...vertices.map(p=>p[2]))};
+      });
       function drawingProgress(building,head){
         if(reduceMotion)return scrollProgress>.001?1:0;
         var opening=smoothstep((scrollProgress-.008)/.055);
@@ -395,24 +468,33 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       }
       function drawStreetscape(head){
         var time=reduceMotion?0:performance.now()*.00035;
-        var ordered=streetscape.slice().sort((a,b)=>a.z-b.z);
-        ordered.forEach(function(building){
+        var queue=[],active=[];
+        function faceDepth(face){return (face.mid[0]-cameraX)*cameraForward[0]+(face.mid[1]-cameraY)*cameraForward[1]+(face.mid[2]-cameraZ)*cameraForward[2]}
+        streetscape.forEach(function(building){
           var ahead=head[2]-building.z,grow=drawingProgress(building,head),leave=1-smoothstep((-ahead-2)/19);
           if(grow<=0||leave<=0||building.z>cameraZ-4)return;
+          active.push(building);
           var roofHeight=Math.max(...building.faces.flatMap(f=>f.points.map(p=>p[1])));
-          // Geometry stays fixed: only the length of each architectural stroke changes.
-          var visible=building.faces.filter(f=>f.normal[0]*(cameraX-f.mid[0])+f.normal[1]*(cameraY-f.mid[1])+f.normal[2]*(cameraZ-f.mid[2])>0);
-          visible.sort((a,b)=>{
-            function depth(f){return (f.mid[0]-cameraX)*cameraForward[0]+(f.mid[1]-cameraY)*cameraForward[1]+(f.mid[2]-cameraZ)*cameraForward[2]}
-            return depth(b)-depth(a);
-          });
           var fade=(.55+.45*(1-smoothstep((ahead-8)/62)))*Math.min(1,grow*6)*leave;
-          visible.forEach(function(face,faceIndex){
+          building.faces.forEach(function(face){
+            if(face.normal[0]*(cameraX-face.mid[0])+face.normal[1]*(cameraY-face.mid[1])+face.normal[2]*(cameraZ-face.mid[2])>0)
+              queue.push({building:building,face:face,grow:grow,leave:leave,roofHeight:roofHeight,fade:fade,depth:faceDepth(face)});
+          });
+        });
+        queue.sort((a,b)=>b.depth-a.depth);
+        prepareDepth(queue);
+        for(var pass=0;pass<2;pass++)queue.forEach(function(entry){
+          var building=entry.building,face=entry.face,grow=entry.grow,leave=entry.leave,roofHeight=entry.roofHeight,fade=entry.fade;
             var points=face.points;
             if(points.length<3)return;
-            var projected=points.map(p=>projectInto(...p,{}));if(projected.some(p=>!p.visible))return;
-            ctx.save();ctx.globalAlpha=smoothstep((grow-.35)/.4);maskArchitecture(points);ctx.restore();
+            var projected=clipPolygon(points).map(p=>projectInto(...p,{}));if(projected.length<3)return;
+            if(pass===0){ctx.save();ctx.globalAlpha=smoothstep((grow-.35)/.4);maskArchitecture(points);ctx.restore();
             fillPolygon3D(points,rgb([65,83,108],face.normal[1]>0?.025:.04),null,smoothstep((grow-.55)/.4)*leave);
+            face.windows.forEach(function(pane){
+              var amount=smoothstep((grow-.5-pane.points[0][1]/roofHeight*.18-(pane.col%4)*.012)/.25);
+              var light=smoothstep((building.z-head[2]-.07*pane.row-.04*pane.col)/1.4);
+              if(light>0&&amount>.95)fillPolygon3D(pane.points,rgb(contourBase,light*(.5+.12*(.5+.5*Math.sin(building.seed+pane.row*1.7+pane.col*2.3)))),null,smoothstep((amount-.95)/.05)*leave);
+            });return;}
             // A travelling, continuous light band sweeps across the complete facade.
             // Its phase never resets: scrolling adds motion without a blinking loop seam.
             var screenX=projected.reduce((n,p)=>n+p.x,0)/projected.length;
@@ -450,7 +532,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               var amount=smoothstep((grow-.5-floor*.18-(pane.col%4)*.012)/.25);
               if(amount<=0)return;
               var light=smoothstep((building.z-head[2]-.07*pane.row-.04*pane.col)/1.4);
-              if(light>0&&amount>.95)fillPolygon3D(points,rgb(contourBase,light*(.5+.12*(.5+.5*Math.sin(building.seed+pane.row*1.7+pane.col*2.3)))),null,smoothstep((amount-.95)/.05)*leave);
               var path=partialPath3D(points.concat([points[0]]),amount);
               strokePath3D(path,'#07101e',fade*contourTransition*.22,1.5);
               strokePath3D(path,gradient,fade*.92,.65);
@@ -462,65 +543,35 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               }
             });
             ctx.restore();
-          });
-          drawPlotDetails(building,head);
         });
-      }
-      // Grayscale vegetation cutouts, anchored in world space with perspective scaling.
-      var treeImages=['assets/tree-hornbeam.webp','assets/tree-maple.webp'].map(function(src){
-        var image=new Image();image.decoding='async';image.src=src;image.onload=function(){if(reduceMotion)draw()};return image;
-      });
-      function makeDetailedTree(x,z,seed){
-        var n=Math.abs(Math.floor(seed));
-        return {x:x,z:z,height:6.2+(n%5)*.36,variant:n%2,flip:n%3===0};
-      }
-      function drawRealisticTree(tree,amount,alpha){
-        var image=treeImages[tree.variant];if(!image.complete||!image.naturalWidth||amount<=0)return;
-        var base=projectInto(tree.x,0,tree.z,{}),top=projectInto(tree.x,tree.height,tree.z,{});
-        if(!base.visible||!top.visible)return;
-        var h=Math.abs(base.y-top.y),w=h*image.naturalWidth/image.naturalHeight;
-        if(w<2||base.x+w<0||base.x-w>width)return;
-        // Reveal the existing tree from trunk to canopy without stretching its proportions.
-        var reveal=smoothstep((amount-.22)/.6),sourceHeight=image.naturalHeight*reveal;
-        if(sourceHeight<1)return;
-        ctx.save();ctx.globalAlpha=alpha*Math.min(1,reveal*4);
-        ctx.translate(base.x,base.y);if(tree.flip)ctx.scale(-1,1);
-        ctx.drawImage(image,0,image.naturalHeight-sourceHeight,image.naturalWidth,sourceHeight,-w*.5,-h*reveal,w,h*reveal);
-        ctx.restore();
+        active.forEach(building=>drawPlotDetails(building,head));
       }
       function drawPlotDetails(building,head){
         var grow=drawingProgress(building,head),ahead=head[2]-building.z;
         if(grow<=0||ahead>45||ahead< -18)return;
         var leave=1-smoothstep((-ahead-2)/19),x=building.x,z=building.z,w=building.w,d=building.depth;
-        var inner=x-building.side*(w*.5+1.15),paths=[];
+        var bounds=building.bounds,front=bounds.maxZ,paths=[];
         function detail(points,stage,weight,alpha){paths.push({points:points,stage:stage,weight:weight||.65,alpha:alpha===undefined?1:alpha})}
         // A fine fence along the inward plot boundary, with vertical posts and two rails.
-        var fenceX=x-building.side*(w*.5+.4);
+        var fenceX=building.side<0?bounds.maxX+1.15:bounds.minX-1.15;
         if(building.variant===2||building.variant>=6||Math.abs(building.seed)%3<1.3){
-          for(var v=.5;v>=-d-.5;v-=1.05)detail([[fenceX,0,z+v],[fenceX,1.1,z+v]],.1,.55);
-          for(var y of [.35,.95])detail([[fenceX,y,z+.5],[fenceX,y,z-d-.5]],.2,.6);
+          for(var v=front+1.6;v>=bounds.minZ-.6;v-=1.05)detail([[fenceX,0,v],[fenceX,1.1,v]],.1,.55);
+          for(var y of [.35,.95])detail([[fenceX,y,front+1.6],[fenceX,y,bounds.minZ-.6]],.2,.6);
           // Recessed entrance gate and horizontal sign plate.
           var gx=x-w*.32;
-          detail([[gx,0,z+.65],[gx,1.65,z+.65],[gx+w*.55,1.65,z+.65],[gx+w*.55,0,z+.65]],.35,.7);
-          detail([[gx,1.34,z+.65],[gx+w*.55,1.34,z+.65]],.48,.4);
+          detail([[gx,0,front+1.6],[gx,1.65,front+1.6],[gx+w*.55,1.65,front+1.6],[gx+w*.55,0,front+1.6]],.35,.7);
+          detail([[gx,1.34,front+1.6],[gx+w*.55,1.34,front+1.6]],.48,.4);
         }
-        if(building.variant<6&&building.variant!==2){
-          // Two distinct realistic silhouettes replace the procedural line sketches.
-          if(!building.trees){
-            building.trees=[];
-            for(var n=0;n<2;n++)building.trees.push(makeDetailedTree(inner-building.side*.25,z-1.1-n*d*.62,building.seed*71+n*123));
-          }
-          building.trees.forEach(function(tree){drawRealisticTree(tree,grow,leave*.95)});
-        }else{
+        if(building.variant===2||building.variant>=6){
           // Service ladders and external pipework distinguish industrial plots.
-          var lx=x+w*.68,hh=building.h*.32;
-          for(var dx of [0,.35])detail([[lx+dx,0,z+.12],[lx+dx,hh+.35,z+.12]],.3,.5);
-          for(var y=.3;y<hh+.35;y+=.4)detail([[lx,y,z+.12],[lx+.35,y,z+.12]],.5,.4);
-          for(var y of [hh*.55,hh*.55+.15])detail([[x-w*.65,y,z+.16],[x+w*.48,y,z+.16],[x+w*.48,hh*.85,z+.16]],.4,.6);
+          var lx=bounds.maxX-.75,hh=building.h*(building.variant===2?.43:building.variant===6?.34:.18)-.4;
+          for(var dx of [0,.35])detail([[lx+dx,0,front+.08],[lx+dx,hh+.35,front+.08]],.3,.5);
+          for(var y=.3;y<hh+.35;y+=.4)detail([[lx,y,front+.08],[lx+.35,y,front+.08]],.5,.4);
+          for(var y of [hh*.55,hh*.55+.15])detail([[x-w*.65,y,front+.1],[x+w*.48,y,front+.1],[x+w*.48,hh*.85,front+.1]],.4,.6);
         }
         // Low plinth and two shallow steps anchor the building to the same ground plane.
-        detail([[x-w*.3,0,z+.7],[x-w*.3,.16,z+.7],[x+w*.3,.16,z+.7],[x+w*.3,0,z+.7]],.12,.55);
-        detail([[x-w*.27,.16,z+.45],[x+w*.27,.16,z+.45]],.2,.45);
+        detail([[x-w*.3,0,front+.7],[x-w*.3,.16,front+.7],[x+w*.3,.16,front+.7],[x+w*.3,0,front+.7]],.12,.55);
+        detail([[x-w*.27,.16,front+.45],[x+w*.27,.16,front+.45]],.2,.45);
         paths.forEach(function(path){
           var amount=smoothstep((grow-path.stage)/.3);if(amount<=0)return;
           var points=partialPath3D(path.points,amount);
@@ -530,6 +581,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       }
       var lanes=[-1,0,1], colors=['#ff3848','#347fff','#ffffff'];
       function draw(){
+        strokeCache=new WeakMap();
         const i=scrollProgress*(route.length-1),head=at(i);
         camera(i);drawBackground();skyContext.drawImage(canvas,0,0);drawStreetscape(head);
         // Far-to-near order keeps the roof and facade silhouettes coherent.

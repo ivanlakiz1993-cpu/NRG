@@ -53,8 +53,6 @@
       var cameraRight = [1,0,0];
       var cameraUp = [0,1,0];
       var backgroundLightness = 0;
-      var contourMix=0,contourTransition=0,lastContrastTime=0;
-      var contourBase=[191,210,235],contourGlint=[250,253,255],contourHalo=[4,10,19];
       var skyLayer=document.createElement("canvas"),skyContext=skyLayer.getContext("2d");
       var cameraTrack;
       var cameraTrackLength = 0;
@@ -200,10 +198,13 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       }
 
       var backgroundPalette=[
-        {at:0,color:[2,3,6]}, {at:.14,color:[3,6,12]},
-        {at:.4,color:[53,112,189]}, {at:.62,color:[159,198,234]},
-        {at:.84,color:[243,248,253]}, {at:1,color:[252,253,255]}
+        {at:0,color:[3,7,16]},
+        {at:.24,color:[9,23,44]},
+        {at:.48,color:[18,39,67]},
+        {at:.72,color:[12,29,55]},
+        {at:1,color:[4,10,23]}
       ];
+
       function smoothstep(t) {
         t=Math.max(0,Math.min(1,t));
         return t*t*(3-2*t);
@@ -234,29 +235,27 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       }
 
       function drawBackground() {
-        var color=backgroundColor(scrollProgress);
+        var progress=scrollProgress;
+        var color=backgroundColor(progress);
         var luminance=color[0]*.2126+color[1]*.7152+color[2]*.0722;
-        backgroundLightness=smoothstep((luminance-42)/170);
-        function relativeLuminance(c){return c.reduce((sum,v,i)=>{v=v/255;v=v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4);return sum+v*[.2126,.7152,.0722][i]},0)}
-        function contrast(a,b){var x=relativeLuminance(a),y=relativeLuminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05)}
-        // Choose the stronger polarity instead of interpolating through the background colour.
-        var light=[197,215,240],dark=[17,29,47];
-        var contrastDelta=contrast(color,dark)-contrast(color,light);
-        var desiredMix=smoothstep((contrastDelta+1.35)/2.7);
-        var now=performance.now(),dt=lastContrastTime?Math.min(.1,(now-lastContrastTime)/1000):0;
-        lastContrastTime=now;
-        contourMix+=(desiredMix-contourMix)*(reduceMotion?1:1-Math.exp(-dt/ .7));
-        contourTransition=4*contourMix*(1-contourMix);
-        contourBase=mixColor(light,dark,contourMix);
-        contourGlint=mixColor([255,255,255],[2,8,18],contourMix);
-        contourHalo=mixColor([1,6,14],[248,251,255],contourMix);
-        // The whole scene changes exposure together; there is no travelling dividing line.
-        ctx.fillStyle=rgb(color);ctx.fillRect(0,0,width,height);
-        var strength=Math.sin(Math.PI*scrollProgress)*.12;
-        var halo=ctx.createRadialGradient(width*.68,height*.34,0,width*.68,height*.34,Math.max(width,height)*.95);
-        halo.addColorStop(0,rgb(mixColor(color,[211,233,252],strength)));
-        halo.addColorStop(1,rgb(color));
-        ctx.fillStyle=halo;ctx.fillRect(0,0,width,height);
+        backgroundLightness=smoothstep((luminance-36)/174);
+        var dark=[2,5,12],blue=[24,48,80],ice=[94,116,146];
+        var top=mixColor(dark,color,.72);
+        var middle=mixColor(color,blue,.18);
+        var bottom=mixColor(color,ice,.12+.2*backgroundLightness);
+        var gradient=ctx.createLinearGradient(width*(.12+.28*progress),0,width*(.78-.22*progress),height);
+        gradient.addColorStop(0,rgb(top));
+        gradient.addColorStop(.48,rgb(middle));
+        gradient.addColorStop(1,rgb(bottom));
+        ctx.fillStyle=gradient;
+        ctx.fillRect(0,0,width,height);
+        var glowX=width*(.22+.56*progress);
+        var glowY=height*(.72-.44*progress);
+        var haze=ctx.createRadialGradient(glowX,glowY,0,glowX,glowY,Math.max(width,height)*.54);
+        haze.addColorStop(0,"rgba(76,111,162,"+(.09+.08*(1-backgroundLightness))+ ")");
+        haze.addColorStop(.42,"rgba(47,75,114,.06)");
+        haze.addColorStop(1,"rgba(2,7,14,0)");
+        ctx.fillStyle=haze;ctx.fillRect(0,0,width,height);
       }
       function maskArchitecture(points){
         var projected=points.map(p=>projectInto(...p,{})).filter(p=>p.visible).sort((a,b)=>a.x-b.x||a.y-b.y);
@@ -278,124 +277,104 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       }
       for(var block=0;block<12;block++)for(var side=-1;side<=1;side+=2){
         var z=8-block*14.5+(side===1?-6.5:0),center=routeCenter(z);
-        var w=(4.4+(block%3)*.85)*1.55,depth=(4.6+(block%3)*.7)*1.35;
+        var w=4.4+(block%3)*.85,depth=4.6+(block%3)*.7;
         var corridor=[routeCenter(z+4),routeCenter(z),routeCenter(z-depth-4),routeCenter(z-22)*.88,routeCenter(z-depth-22)*.88];
         var edge=side<0?Math.min(...corridor):Math.max(...corridor);
         var x=edge+side*(7+w*.5+(block%2)*.8);
-        var h=(7+(block*5+(side===1?4:0))%10)*1.8;
-        streetscape.push({x:x,z:z,w:w,depth:depth,h:h,side:side,variant:(block+(side===1?3:0))%6,seed:block*1.37+side});
+        var h=8+(block*7+(side+1)*2)%7;
+        streetscape.push({x:x,z:z,w:w,depth:depth,h:h,side:side,variant:[0,3,1,3][(block+(side===1?1:0))%4],seed:block*1.37+side});
       }
-      function makeArchitecture(building){
-        var faces=[],x=building.x,z=building.z,w=building.w,d=building.depth,h=building.h;
-        function prism(footprint,y0,tops,detail){
-          if(typeof tops==='number')tops=footprint.map(()=>tops);
-          var bottom=footprint.map(p=>[x+p[0],y0,z+p[1]]),top=footprint.map((p,i)=>[x+p[0],tops[i],z+p[1]]);
-          var centre=[x+footprint.reduce((n,p)=>n+p[0],0)/footprint.length,(y0+Math.max(...tops))*.5,z+footprint.reduce((n,p)=>n+p[1],0)/footprint.length];
-          function face(points,windows){
-            var u=points[1].map((v,i)=>v-points[0][i]),v=points[2].map((v,i)=>v-points[0][i]);
-            var normal=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
-            var mid=points.reduce((sum,p)=>sum.map((n,i)=>n+p[i]/points.length),[0,0,0]);
-            if(normal.reduce((n,v,i)=>n+v*(mid[i]-centre[i]),0)<0)normal=normal.map(v=>-v);
-            faces.push({points:points,normal:normal,mid:mid,windows:windows||[]});
-          }
-          for(var i=0;i<footprint.length;i++){
-            var j=(i+1)%footprint.length,points=[bottom[i],bottom[j],top[j],top[i]],windows=[];
-            var span=Math.hypot(bottom[j][0]-bottom[i][0],bottom[j][2]-bottom[i][2]);
-            if(detail&&span>.55){
-              var rows=Math.max(1,Math.floor((Math.min(tops[i],tops[j])-y0-.7)/1.65));
-              var cols=Math.max(1,Math.floor(span/(building.variant===4?1.1:1.45)));
-              for(var row=0;row<rows;row++)for(var col=0;col<cols;col++){
-                var t0=(col+.23)/cols,t1=(col+.77)/cols;
-                var wy=y0+.6+row*(Math.min(tops[i],tops[j])-y0-.9)/rows,wh=(Math.min(tops[i],tops[j])-y0-.9)/rows*.51;
-                var ax=bottom[i][0]+(bottom[j][0]-bottom[i][0])*t0,az=bottom[i][2]+(bottom[j][2]-bottom[i][2])*t0;
-                var bx=bottom[i][0]+(bottom[j][0]-bottom[i][0])*t1,bz=bottom[i][2]+(bottom[j][2]-bottom[i][2])*t1;
-                windows.push({points:[[ax,wy,az],[bx,wy,bz],[bx,wy+wh,bz],[ax,wy+wh,az]],row:row,col:col});
-              }
-            }
-            face(points,windows);
-          }
-          face(top);
-        }
-        function box(l,r,b,t,front,back,detail=true){prism([[l,front],[r,front],[r,back],[l,back]],b,t,detail)}
-        if(building.variant===0){
-          // Terraced residential building: three real setbacks, not a box with a roof ornament.
-          box(-w*.5,w*.5,0,h*.46,0,-d);
-          box(-w*.5+.3,w*.28,h*.46,h*.78,-.45,-d+.3);
-          box(-w*.5+.7,w*.04,h*.78,h+1,-1,-d+.65);
-        }else if(building.variant===1){
-          // Slender tower with chamfered corners and a restrained sloping crown.
-          var r=w*.38,c=.65;
-          prism([[-r+c,0],[r-c,0],[r,-c],[r,-d+c],[r-c,-d],[-r+c,-d],[-r,-d+c],[-r,-c]],0,[h,h+1.5,h+1.5,h+1,h,h-.5,h-.5,h],true);
-          box(-r-.3,r+.3,0,1.1,.2,-d-.2,false);
-        }else if(building.variant===2){
-          // Low industrial pavilion with a flat clerestory and rooftop ventilation.
-          box(-w*.65,w*.65,0,h*.43,0,-d);
-          box(-w*.42,w*.36,h*.43,h*.43+.7,-1,-d+1,true);
-          for(var k=0;k<2;k++)box(-w*.3+k*w*.4,-w*.05+k*w*.4,h*.43+.7,h*.43+1.2,-1.6,-d+1.5,false);
-        }else if(building.variant===3){
-          // Two offset wings joined by a low podium.
-          box(-w*.58,w*.58,0,1.7,.2,-d,false);
-          box(-w*.55,-w*.04,1.7,h,-.15,-d*.72);
-          box(w*.08,w*.53,1.7,h*.73,-d*.2,-d);
-        }else if(building.variant===4){
-          // Rounded corner office: a faceted cylindrical footprint with continuous curved glazing.
-          var footprint=[];for(var k=0;k<14;k++){var angle=k/14*Math.PI*2;footprint.push([Math.cos(angle)*w*.52,-d*.5+Math.sin(angle)*d*.5])}
-          prism(footprint,0,h,true);
-          var crown=footprint.map(p=>[p[0]*.78,-d*.5+(p[1]+d*.5)*.78]);prism(crown,h,h+.65,false);
-        }else{
-          // Broad commercial block, recessed entrance volume and an asymmetric upper wing.
-          box(-w*.64,w*.64,0,h*.48,0,-d);
-          box(-w*.6,-w*.04,h*.48,h*.84,-d*.22,-d);
-          box(-w*.72,w*.69,1.35,1.55,.4,-.65,false);
-        }
-        return faces;
-      }
-      streetscape.forEach(b=>b.faces=makeArchitecture(b));
       function drawStreetscape(head){
-        var time=reduceMotion?0:performance.now()*.00035;
+        var time=reduceMotion?0:performance.now()*.0006;
+        // Fixed world positions and depth ordering preserve parallax as the camera passes.
         var ordered=streetscape.slice().sort((a,b)=>a.z-b.z);
         ordered.forEach(function(building){
-          var ahead=head[2]-building.z,grow=smoothstep((70-ahead)/36),leave=1-smoothstep((-ahead-2)/19);
+          var ahead=head[2]-building.z;
+          var grow=smoothstep((70-ahead)/36);
+          var leave=1-smoothstep((-ahead-2)/19);
           if(grow<=0||leave<=0||building.z>cameraZ-4)return;
-          var visible=building.faces.filter(f=>f.normal[0]*(cameraX-f.mid[0])+f.normal[1]*(cameraY-f.mid[1])+f.normal[2]*(cameraZ-f.mid[2])>0);
-          visible.sort((a,b)=>{
-            function depth(f){return (f.mid[0]-cameraX)*cameraForward[0]+(f.mid[1]-cameraY)*cameraForward[1]+(f.mid[2]-cameraZ)*cameraForward[2]}
-            return depth(b)-depth(a);
-          });
-          var fade=(.48+.52*(1-smoothstep((ahead-8)/62)))*grow*leave;
-          visible.forEach(function(face,faceIndex){
-            var transform=p=>[p[0],p[1]*(.92+.08*grow),p[2]];
-            var points=face.points.map(transform);
-            var projected=points.map(p=>projectInto(...p,{}));if(projected.some(p=>!p.visible))return;
-            maskArchitecture(points);
-            fillPolygon3D(points,rgb([65,83,108],face.normal[1]>0?.025:.04),null,grow*leave);
-            // A travelling, continuous light band sweeps across the complete facade.
-            // Its phase never resets: scrolling adds motion without a blinking loop seam.
-            var screenX=projected.reduce((n,p)=>n+p.x,0)/projected.length;
-            var screenY=projected.reduce((n,p)=>n+p.y,0)/projected.length;
-            var span=Math.max(60,...projected.map(p=>Math.abs(p.x-screenX)),...projected.map(p=>Math.abs(p.y-screenY)))*1.4;
-            var gradient=ctx.createLinearGradient(screenX-span,screenY+span*.3,screenX+span,screenY-span*.3);
-            var neutralBase=contourBase;
-            var neutralGlint=contourGlint;
-            var phase=reduceMotion?.25:time*.42+building.seed*.11+scrollProgress*1.7;
-            for(var band=0;band<=36;band++){
-              var t=band/36;
-              var wave=Math.pow(.5+.5*Math.cos((t*1.35-phase)*Math.PI*2),9);
-              gradient.addColorStop(t,rgb(mixColor(neutralBase,neutralGlint,wave)));
-            }
-            ctx.save();ctx.globalCompositeOperation='source-over';
-            // Two quiet opposite underlays keep edges readable during the crossfade.
-            strokePath3D(points.concat([points[0]]),'#06101e',fade*contourTransition*.3,2.5);
-            strokePath3D(points.concat([points[0]]),'#f4f8ff',fade*contourTransition*.2,1.5);
-            strokePath3D(points.concat([points[0]]),rgb(contourHalo),fade*.22,2.1);
-            strokePath3D(points.concat([points[0]]),gradient,fade,.95);
-            face.windows.forEach(function(pane){
-              var p=pane.points.map(transform),light=smoothstep((building.z-head[2]-.07*pane.row-.04*pane.col)/1.4);
-              if(light>0)fillPolygon3D(p,rgb(contourBase,light*(.5+.12*(.5+.5*Math.sin(building.seed+pane.row*1.7+pane.col*2.3)))),null,grow*leave);
-              strokePath3D(p.concat([p[0]]),'#07101e',fade*contourTransition*.22,1.5);
-              strokePath3D(p.concat([p[0]]),gradient,fade*.92,.65);
-            });
+          var x=building.x,z=building.z,w=building.w,d=building.depth;
+          var left=x-w*.5,right=x+w*.5,h=building.h*grow;
+          var lines=[],facadeWindows=[];
+          function line(points,weight){lines.push({points:points,weight:weight||.65})}
+          // Only silhouette, roof and the camera-facing return: no visible rear wireframe.
+          var nearSide=cameraX<x?left:right,farSide=cameraX<x?right:left;
+          line([[left,0,z],[left,h,z],[right,h,z],[right,0,z]],.8);
+          line([[left,0,z],[right,0,z]],.45);
+          line([[nearSide,0,z],[nearSide,0,z-d],[nearSide,h,z-d],[nearSide,h,z]],.65);
+          line([[nearSide,h,z-d],[farSide,h,z-d],[farSide,h,z]],.55);
+          if(building.variant===0){
+            // Recessed crown, narrow vertical ribs, raised podium.
+            line([[left-.25,1.05*grow,z+.35],[right+.25,1.05*grow,z+.35],[right+.25,0,z+.35]],.65);
+            line([[left+.45,h,z],[left+.45,h+.75*grow,z-.5],[right-.6,h+.75*grow,z-.5],[right-.6,h,z]],.65);
+            line([[nearSide+(cameraX<x?.38:-.38),1.1*grow,z+.01],[nearSide+(cameraX<x?.38:-.38),h-.5*grow,z+.01]],.35);
+          }else if(building.variant===1){
+            // Offset upper tower creates a stepped commercial silhouette.
+            var top=h+3.4*grow;
+            line([[left+.7,h,z-.7],[left+.7,top,z-.7],[right-.5,top,z-.7],[right-.5,h,z-.7]],.7);
+            line([[left+.7,top,z-.7],[left+.7,top,z-d+.5],[right-.5,top,z-d+.5],[right-.5,top,z-.7]],.5);
+            line([[left,h*.78,z],[right,h*.78,z]],.28);
+          }else if(building.variant===2){
+            // Industrial annex and roof lantern.
+            line([[left-.8,0,z+.5],[left-.8,h*.34,z+.5],[right+.5,h*.34,z+.5],[right+.5,0,z+.5]],.7);
+            line([[left-.8,h*.34,z+.5],[left-.8,h*.34,z-1.2],[right+.5,h*.34,z-1.2]],.4);
+            line([[x-.5,h,z-1],[x-.5,h+2*grow,z-1],[x+.5,h+2*grow,z-1],[x+.5,h,z-1]],.55);
+          }else{
+            line([[left+.25,0,z+.05],[left+.25,h,z+.05]],.35);
+            line([[right-.25,0,z+.05],[right-.25,h,z+.05]],.35);
+            line([[left,h-.3*grow,z],[right,h-.3*grow,z]],.4);
+          }
+          // Window frames and illumination exist on every building, including the side return.
+          function windowPane(points,row,col){
+            facadeWindows.push({points:points,row:row,col:col});
+            line(points.concat([points[0]]),.38);
+          }
+          var floors=Math.max(3,Math.floor(building.h/1.7)),cols=building.variant===3?3:4;
+          var base=building.variant===2?building.h*.37:1.25;
+          var stepY=(building.h-.65-base)/floors;
+          for(var row=0;row<floors;row++)for(var col=0;col<cols;col++){
+            var wx=left+.48+col*(w-.8)/cols,wy=(base+row*stepY)*grow;
+            var ww=(w-.8)/cols*.57,wh=stepY*.54*grow;
+            windowPane([[wx,wy,z+.025],[wx+ww,wy,z+.025],[wx+ww,wy+wh,z+.025],[wx,wy+wh,z+.025]],row,col);
+          }
+          for(var row=0;row<floors;row++)for(var col=0;col<3;col++){
+            var wz=z-.55-col*(d-.9)/3,wy=(base+row*stepY)*grow;
+            var wd=(d-.9)/3*.55,wh=stepY*.54*grow;
+            windowPane([[nearSide,wy,wz],[nearSide,wy,wz-wd],[nearSide,wy+wh,wz-wd],[nearSide,wy+wh,wz]],row,col+cols);
+          }
+          if(building.variant===1)for(var row=0;row<2;row++)for(var col=0;col<3;col++){
+            var wx=left+1+col*(w-1.6)/3,wy=h+(.55+row*1.25)*grow,ww=(w-1.6)/3*.55;
+            windowPane([[wx,wy,z-.68],[wx+ww,wy,z-.68],[wx+ww,wy+.65*grow,z-.68],[wx,wy+.65*grow,z-.68]],row+floors,col);
+          }
+          if(building.variant===2)for(var col=0;col<4;col++){
+            var wx=left-.45+col*(w+.9)/4,wy=building.h*.19*grow,ww=(w+.9)/4*.6,wh=.7*grow;
+            windowPane([[wx,wy,z+.525],[wx+ww,wy,z+.525],[wx+ww,wy+wh,z+.525],[wx,wy+wh,z+.525]],0,col);
+          }
+          maskArchitecture(lines.flatMap(path=>path.points));
+          // Restrained face values reveal depth without introducing a new palette.
+          fillPolygon3D([[left,0,z],[right,0,z],[right,h,z],[left,h,z]],rgb([104,125,153],.025),null,grow*leave);
+          fillPolygon3D([[nearSide,0,z],[nearSide,0,z-d],[nearSide,h,z-d],[nearSide,h,z]],rgb([2,7,16],.14),null,grow*leave);
+          facadeWindows.forEach(function(pane){
+            // The head crossing this facade's depth powers the building, floor by floor.
+            var light=smoothstep((building.z-head[2]-.07*pane.row-.045*pane.col)/1.4);
+            if(light<=0)return;
+            ctx.save();ctx.shadowColor='rgba(192,222,255,.7)';ctx.shadowBlur=2.8*light;
+            var brightness=.48+.18*(.5+.5*Math.sin(building.seed+pane.row*1.7+pane.col*2.3));
+            fillPolygon3D(pane.points,rgb([213,233,255],light*brightness),null,grow*leave);
             ctx.restore();
+          });
+          var distanceFade=.22+.78*(1-smoothstep((ahead-8)/62));
+          lines.forEach(function(path,j){
+            var first=projectInto(...path.points[0],{}),last=projectInto(...path.points[path.points.length-1],{});
+            if(!first.visible||!last.visible)return;
+            var shimmer=.5+.5*Math.sin(time+building.seed+j*.41+scrollProgress*8);
+            var gradient=ctx.createLinearGradient(first.x,first.y,last.x+.1,last.y+.1);
+            var dark=mixColor([69,91,125],[57,76,105],backgroundLightness);
+            var bright=mixColor([160,179,204],[109,134,169],backgroundLightness);
+            gradient.addColorStop(0,rgb(mixColor(dark,bright,shimmer*.55)));
+            gradient.addColorStop(.5,rgb(mixColor(dark,bright,.25+.75*shimmer)));
+            gradient.addColorStop(1,rgb(dark));
+            strokePath3D(path.points,gradient,grow*leave*distanceFade*.77,path.weight);
           });
         });
       }
@@ -415,7 +394,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             line.push([v[0]+lane*.34*spread,v[1]+lane*.12*spread,v[2]]);
           }
           var color=colors[laneIndex];
-          ctx.save();ctx.globalCompositeOperation='source-over';
+          ctx.save();ctx.globalCompositeOperation='screen';
           strokePath3D(line,color,.07,17);strokePath3D(line,color,.17,7);
           strokePath3D(line,color,1,2.3);strokePath3D(line,'#ffffff',.72,.65);
           if(!reduceMotion){
@@ -436,7 +415,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
   </script>
 </body>
 </html>
-
 
 
 

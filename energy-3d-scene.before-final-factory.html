@@ -10,7 +10,7 @@
     html, body { margin: 0; min-height: 100%; background: #03060e; }
     html { scrollbar-color: #6b82ab #080d17; }
     body { overflow-x: hidden; }
-    .flight { position: relative; height: 1150svh; }
+    .flight { position: relative; height: 900svh; }
     .screen {
       position: sticky; top: 0; width: 100%; height: 100svh; min-height: 0;
       overflow: hidden; background: #03060e; isolation: isolate;
@@ -22,7 +22,7 @@
     canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
     @media (max-width: 700px) {
       .screen { min-height: 0; }
-      .flight { height: 980svh; }
+      .flight { height: 760svh; }
     }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
@@ -94,32 +94,20 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         [0,2.8,6],[0,2.5,3],[0,2,-5],[-8,1.5,-13],stops[0].socket,
         [-16,1.35,-21.4],[-13,1.35,-22.4],[-12,1.65,-25],[-8,2.5,-33],
         [4,2,-40],[9,1.35,-46],stops[1].socket,[8,1.35,-51],
-        [3,1.35,-53],[0,1.65,-55],[-2,2.1,-61],[0,2.8,-68],[-9,1.5,-76],stops[2].socket,[-12,1.35,-84],[-8,1.7,-89],[0,2.4,-99],[8,1.35,-110],stops[3].socket,[7,1.35,-118],[0,2,-126],[0,3,-143],
-        [0,3,-160],[3,3,-174],[14,3,-183],[33,3,-185],[56,3,-185],[76,3,-185],[80,3,-185]
+        [3,1.35,-53],[0,1.65,-55],[-2,2.1,-61],[0,2.8,-68],[-9,1.5,-76],stops[2].socket,[-12,1.35,-84],[-8,1.7,-89],[0,2.4,-99],[8,1.35,-110],stops[3].socket,[7,1.35,-118],[0,2,-126],[0,3,-143]
       ],36);      function at(i){i=Math.max(0,Math.min(route.length-1,i));var k=Math.floor(i),a=route[k],b=route[Math.min(k+1,route.length-1)];return a.map((v,j)=>v+(b[j]-v)*(i-k))}
-      var originalRouteEnd=26*36;
       function camera(i){
         var head=at(i), rear=at(i-38);
         cameraX=head[0]*.88; cameraY=3.7+Math.min(2,head[1]*.1); cameraZ=head[2]+22;
         function unit(v){var l=Math.hypot(...v)||1;return v.map(n=>n/l)}
-        var turn=smoothstep((i-originalRouteEnd)/90);
-        var before=at(i-18),after=at(i+18),heading=unit([after[0]-before[0],0,after[2]-before[2]]);
-        var followDistance=44+Math.max(0,92*focal/(width*1.04)-48)*turn;
-        cameraX+=(head[0]-heading[0]*followDistance-cameraX)*turn;
-        cameraZ+=(head[2]-heading[2]*followDistance-cameraZ)*turn;
-        cameraX-=heading[2]*11*turn;cameraZ+=heading[0]*11*turn;
-        cameraY+=(5.2-cameraY)*turn;
-        var targetX=head[0]+heading[0]*5*turn;
-        var targetZ=head[2]-3*(1-turn)+heading[2]*5*turn;
-        var targetY=(head[1]+.7)*(1-turn)+12.5*turn;
-        cameraForward=unit([targetX-cameraX,targetY-cameraY,targetZ-cameraZ]);
+        cameraForward=unit([head[0]-cameraX,head[1]+.7-cameraY,head[2]-3-cameraZ]);
         var f=cameraForward,r=cameraRight=unit([-f[2],0,f[0]]);
         cameraUp=[-r[2]*f[1],r[2]*f[0]-r[0]*f[2],r[0]*f[1]];
       }
       var scratchA={x:0,y:0,scale:0,visible:false};
       var scratchB={x:0,y:0,scale:0,visible:false};
       var polyBuffer=[];
-      for(var pb=0;pb<64;pb++) polyBuffer.push({x:0,y:0,scale:0,visible:false});
+      for(var pb=0;pb<24;pb++) polyBuffer.push({x:0,y:0,scale:0,visible:false});
 
       function resize() {
         var rect=canvas.getBoundingClientRect();
@@ -316,8 +304,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
 
       function drawBackground() {
         var color=backgroundColor(scrollProgress);
-        var finale=smoothstep((scrollProgress*(route.length-1)-originalRouteEnd+12)/65);
-        color=mixColor(color,[2,3,6],finale);
         var luminance=color[0]*.2126+color[1]*.7152+color[2]*.0722;
         backgroundLightness=smoothstep((luminance-42)/170);
         function relativeLuminance(c){return c.reduce((sum,v,i)=>{v=v/255;v=v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4);return sum+v*[.2126,.7152,.0722][i]},0)}
@@ -356,7 +342,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       var streetscape=[];
       function routeCenter(z){
         var nearest=route[0];
-        for(var j=1;j<=originalRouteEnd;j++)if(Math.abs(route[j][2]-z)<Math.abs(nearest[2]-z))nearest=route[j];
+        for(var j=1;j<route.length;j++)if(Math.abs(route[j][2]-z)<Math.abs(nearest[2]-z))nearest=route[j];
         return nearest[0];
       }
       for(var block=0;block<12;block++)for(var side=-1;side<=1;side+=2){
@@ -381,91 +367,41 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             if(normal.reduce((n,v,i)=>n+v*(mid[i]-centre[i]),0)<0)normal=normal.map(v=>-v);
             faces.push({points:points,normal:normal,mid:mid,windows:windows||[]});
           }
-          var sideFaces=[];
           for(var i=0;i<footprint.length;i++){
             var j=(i+1)%footprint.length,points=[bottom[i],bottom[j],top[j],top[i]],windows=[];
             var span=Math.hypot(bottom[j][0]-bottom[i][0],bottom[j][2]-bottom[i][2]);
             if(detail&&span>.55){
-              var windowStyle=building.final?2:building.variant%4;
-              var rows=Math.max(1,Math.floor((Math.min(tops[i],tops[j])-y0-.7)/(building.final?4.8:windowStyle===3?2.7:2.1)));
+              var windowStyle=building.variant%4;
+              var rows=Math.max(1,Math.floor((Math.min(tops[i],tops[j])-y0-.7)/(windowStyle===3?2.7:2.1)));
               var cols=Math.max(1,Math.floor(span/(windowStyle===2?3.2:windowStyle===1?1.25:1.8)));
               for(var row=0;row<rows;row++)for(var col=0;col<cols;col++){
                 var inset=windowStyle===1?.34:windowStyle===2?.08:.22;
                 var t0=(col+inset)/cols,t1=(col+1-inset)/cols;
                 var wy=y0+.6+row*(Math.min(tops[i],tops[j])-y0-.9)/rows,wh=(Math.min(tops[i],tops[j])-y0-.9)/rows*(windowStyle===1?.78:windowStyle===2?.38:.57);
-                if(building.final&&wy<6.5)continue;
                 var ax=bottom[i][0]+(bottom[j][0]-bottom[i][0])*t0,az=bottom[i][2]+(bottom[j][2]-bottom[i][2])*t0;
                 var bx=bottom[i][0]+(bottom[j][0]-bottom[i][0])*t1,bz=bottom[i][2]+(bottom[j][2]-bottom[i][2])*t1;
                 windows.push({points:[[ax,wy,az],[bx,wy,bz],[bx,wy+wh,bz],[ax,wy+wh,az]],row:row,col:col,style:windowStyle});
               }
             }
-            face(points,windows);sideFaces.push(faces[faces.length-1]);
+            face(points,windows);
           }
-          sideFaces.forEach(function(f,i){
-            var next=sideFaces[(i+1)%sideFaces.length],prev=sideFaces[(i+sideFaces.length-1)%sideFaces.length];
-            function smooth(other){var a=f.normal,b=other.normal;return a.reduce((sum,v,j)=>sum+v*b[j],0)/(Math.hypot(...a)*Math.hypot(...b))>.94;}
-            f.curvedEdges={1:smooth(next)?next:null,3:smooth(prev)?prev:null};
-          });
           face(top);
         }
-        function roundedFootprint(l,r,front,back,radius){
-          var rad=Math.min(radius,(r-l)*.45,(front-back)*.45),out=[];
-          for(var corner of [[r-rad,front-rad,0],[r-rad,back+rad,-Math.PI/2],[l+rad,back+rad,-Math.PI],[l+rad,front-rad,-Math.PI*1.5]]){
-            for(var k=0;k<=6;k++){var angle=corner[2]+Math.PI/2-k*Math.PI/12;out.push([corner[0]+Math.cos(angle)*rad,corner[1]+Math.sin(angle)*rad]);}
-          }
-          return out;
-        }
-        function roundBox(l,r,b,t,front,back,radius,detail=true){prism(roundedFootprint(l,r,front,back,radius),b,t,detail);}
-        function box(l,r,b,t,front,back,detail=true){
-          var radius=(building.variant===0||building.variant===3||building.variant===5)?Math.min((r-l)*.14,1.25):0;
-          if(radius>.2)roundBox(l,r,b,t,front,back,radius,detail);
-          else prism([[l,front],[r,front],[r,back],[l,back]],b,t,detail);
-        }
-        function vault(l,r,base,rise,front,back){
-          for(var k=0;k<24;k++){
-            var a=k/24*Math.PI,b=(k+1)/24*Math.PI;
-            var x0=(l+r)/2-Math.cos(a)*(r-l)/2,x1=(l+r)/2-Math.cos(b)*(r-l)/2;
-            prism([[x0,front],[x1,front],[x1,back],[x0,back]],base,[base+Math.sin(a)*rise,base+Math.sin(b)*rise,base+Math.sin(b)*rise,base+Math.sin(a)*rise],false);
-          }
-        }
-        if(building.variant===8){
-          // Long-span vaulted hall, rounded administration wing and an asymmetric service tower.
-          roundBox(-29,22,0,20,0,-28,2.8,true);
-          vault(-28,21,20,9,-2,-26);
-          roundBox(-42,-29,0,14,3,-18,3,true);
-          roundBox(22,33,0,36,-4,-24,2.4,true);
-          roundBox(-7,8,20,33,-14,-29,3.4,true);
-          roundBox(-33,26,5.8,6.2,2.3,-1,1.2,false);
-          for(var stack=0;stack<2;stack++){
-            var sx=-20+stack*6,foot=[];
-            for(var k=0;k<24;k++){var angle=k/24*Math.PI*2;foot.push([sx+Math.cos(angle)*1.15,-22+Math.sin(angle)*1.15]);}
-            prism(foot,22,stack?43:47,false);
-          }
-          // Freestanding cylindrical storage vessels in their own service yard.
-          for(var tank=0;tank<2;tank++){
-            var sx=39+tank*9,foot=[];
-            for(var k=0;k<32;k++){var angle=k/32*Math.PI*2;foot.push([sx+Math.cos(angle)*3.4,-9+Math.sin(angle)*3.4]);}
-            prism(foot,0,11+tank*2,false);
-            var cap=foot.map(p=>[sx+(p[0]-sx)*.92,-9+(p[1]+9)*.92]);prism(cap,11+tank*2,11.5+tank*2,false);
-          }
-          // Elevated pipe rack set in front of the hall, with a clear central entrance.
-          for(var sx of [-25,-15,15,25])box(sx-.18,sx+.18,0,5.8,6.6,6.1,false);
-          box(-26,-6,5.5,5.8,6.8,5.9,false);box(6,26,5.5,5.8,6.8,5.9,false);
-        }else if(building.variant===0){
+        function box(l,r,b,t,front,back,detail=true){prism([[l,front],[r,front],[r,back],[l,back]],b,t,detail)}
+        if(building.variant===0){
           // Terraced residential building: three real setbacks, not a box with a roof ornament.
           box(-w*.5,w*.5,0,h*.46,0,-d);
           box(-w*.5+.3,w*.28,h*.46,h*.78,-.45,-d+.3);
           box(-w*.5+.7,w*.04,h*.78,h+1,-1,-d+.65);
         }else if(building.variant===1){
           // Slender tower with chamfered corners and a restrained sloping crown.
-          var r=w*.4,footprint=roundedFootprint(-r,r,0,-d,Math.min(1.8,r*.5));
-          var tops=footprint.map(p=>h+1+(p[0]/r)*.7);
-          prism(footprint,0,tops,true);
-          roundBox(-r-.3,r+.3,0,1.1,.2,-d-.2,1.4,false);
+          var r=w*.38,c=.65;
+          prism([[-r+c,0],[r-c,0],[r,-c],[r,-d+c],[r-c,-d],[-r+c,-d],[-r,-d+c],[-r,-c]],0,[h,h+1.5,h+1.5,h+1,h,h-.5,h-.5,h],true);
+          box(-r-.3,r+.3,0,1.1,.2,-d-.2,false);
         }else if(building.variant===2){
           // Low industrial pavilion with a flat clerestory and rooftop ventilation.
           box(-w*.65,w*.65,0,h*.43,0,-d);
-          vault(-w*.6,w*.6,h*.43,2.8,-.5,-d+.5);
+          box(-w*.42,w*.36,h*.43,h*.43+.7,-1,-d+1,true);
           for(var k=0;k<2;k++)box(-w*.3+k*w*.4,-w*.05+k*w*.4,h*.43+.7,h*.43+1.2,-1.6,-d+1.5,false);
         }else if(building.variant===3){
           // Two offset wings joined by a low podium.
@@ -474,7 +410,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           box(w*.08,w*.53,1.7,h*.73,-d*.2,-d);
         }else if(building.variant===4){
           // Rounded corner office: a faceted cylindrical footprint with continuous curved glazing.
-          var footprint=[];for(var k=0;k<32;k++){var angle=k/32*Math.PI*2;footprint.push([Math.cos(angle)*w*.52,-d*.5+Math.sin(angle)*d*.5])}
+          var footprint=[];for(var k=0;k<14;k++){var angle=k/14*Math.PI*2;footprint.push([Math.cos(angle)*w*.52,-d*.5+Math.sin(angle)*d*.5])}
           prism(footprint,0,h,true);
           var crown=footprint.map(p=>[p[0]*.78,-d*.5+(p[1]+d*.5)*.78]);prism(crown,h,h+.65,false);
         }else if(building.variant===6){
@@ -499,30 +435,19 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           }
           box(-w*.6,w*.6,h*.29,h*.32,-.45,-1.05,false);
         }else{
-          // Curving campus: a broad capsule podium and a smaller offset oval upper wing.
-          roundBox(-w*.64,w*.64,0,h*.43,0,-d,Math.min(d*.44,w*.35),true);
-          roundBox(-w*.58,w*.16,h*.43,h*.86,-d*.15,-d+.4,Math.min(d*.32,w*.26),true);
-          roundBox(-w*.7,w*.69,1.35,1.6,.45,-1.8,.95,false);
+          // Broad commercial block, recessed entrance volume and an asymmetric upper wing.
+          box(-w*.64,w*.64,0,h*.48,0,-d);
+          box(-w*.6,-w*.04,h*.48,h*.84,-d*.22,-d);
+          box(-w*.72,w*.69,1.35,1.55,.4,-.65,false);
         }
         return faces;
       }
-      var finalFactory={x:0,z:0,w:56,depth:20,h:25,side:1,variant:8,seed:42,final:true};
-      streetscape.push(finalFactory);
       streetscape.forEach(function(b){
         b.faces=makeArchitecture(b);
-        if(b.final){
-          function rotate(p){return [84-p[2],p[1],-185+p[0]];}
-          b.faces.forEach(function(face){
-            face.points=face.points.map(rotate);face.mid=rotate(face.mid);
-            var n=face.normal;face.normal=[-n[2],n[1],n[0]];
-            face.windows.forEach(pane=>pane.points=pane.points.map(rotate));
-          });
-        }
         var vertices=b.faces.flatMap(f=>f.points);
         b.bounds={minX:Math.min(...vertices.map(p=>p[0])),maxX:Math.max(...vertices.map(p=>p[0])),minZ:Math.min(...vertices.map(p=>p[2])),maxZ:Math.max(...vertices.map(p=>p[2]))};
       });
       function drawingProgress(building,head){
-        if(building.final)return smoothstep((scrollProgress*(route.length-1)-originalRouteEnd-25)/130);
         if(reduceMotion)return scrollProgress>.001?1:0;
         var opening=smoothstep((scrollProgress-.008)/.055);
         var distance=head[2]-building.z;
@@ -541,20 +466,16 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         }
         return out;
       }
-      function windowVisible(points){
-        var centre=points.reduce((sum,p)=>sum.map((v,i)=>v+p[i]/points.length),[0,0,0]);
-        return points.concat([centre]).every(function(p){var q=projectInto(...p,{});return q.visible&&visibleAt(q.x,q.y,1/q.depth);});
-      }
       function drawStreetscape(head){
         var time=reduceMotion?0:performance.now()*.00035;
         var queue=[],active=[];
         function faceDepth(face){return (face.mid[0]-cameraX)*cameraForward[0]+(face.mid[1]-cameraY)*cameraForward[1]+(face.mid[2]-cameraZ)*cameraForward[2]}
         streetscape.forEach(function(building){
-          var ahead=head[2]-building.z,grow=drawingProgress(building,head),leave=building.final?1:1-smoothstep((-ahead-2)/19);
-          if(grow<=0||leave<=0||(!building.final&&building.z>cameraZ-4))return;
+          var ahead=head[2]-building.z,grow=drawingProgress(building,head),leave=1-smoothstep((-ahead-2)/19);
+          if(grow<=0||leave<=0||building.z>cameraZ-4)return;
           active.push(building);
           var roofHeight=Math.max(...building.faces.flatMap(f=>f.points.map(p=>p[1])));
-          var fade=(building.final?1:(.55+.45*(1-smoothstep((ahead-8)/62))))*Math.min(1,grow*6)*leave;
+          var fade=(.55+.45*(1-smoothstep((ahead-8)/62)))*Math.min(1,grow*6)*leave;
           building.faces.forEach(function(face){
             if(face.normal[0]*(cameraX-face.mid[0])+face.normal[1]*(cameraY-face.mid[1])+face.normal[2]*(cameraZ-face.mid[2])>0)
               queue.push({building:building,face:face,grow:grow,leave:leave,roofHeight:roofHeight,fade:fade,depth:faceDepth(face)});
@@ -571,8 +492,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             fillPolygon3D(points,rgb([65,83,108],face.normal[1]>0?.025:.04),null,smoothstep((grow-.55)/.4)*leave);
             face.windows.forEach(function(pane){
               var amount=smoothstep((grow-.5-pane.points[0][1]/roofHeight*.18-(pane.col%4)*.012)/.25);
-              var light=building.final?smoothstep((head[0]-71-.2*pane.row-.1*pane.col)/6):smoothstep((building.z-head[2]-.07*pane.row-.04*pane.col)/1.4);
-              if(light>0&&amount>.95&&windowVisible(pane.points)){
+              var light=smoothstep((building.z-head[2]-.07*pane.row-.04*pane.col)/1.4);
+              if(light>0&&amount>.95){
                 // Interior lamps keep a soft warm-white tone, independent of contour polarity.
                 var lamp=mixColor([255,240,216],[230,206,169],backgroundLightness);
                 var roomBrightness=.46+.14*(.5+.5*Math.sin(building.seed+pane.row*1.7+pane.col*2.3));
@@ -596,8 +517,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             ctx.save();ctx.globalCompositeOperation='source-over';
             // Trace ground-level edges first, then uprights, then roof lines.
             for(var edge=0;edge<points.length;edge++){
-              var adjacent=face.curvedEdges&&face.curvedEdges[edge];
-              if(adjacent&&adjacent.normal.reduce((sum,n,j)=>sum+n*([cameraX,cameraY,cameraZ][j]-adjacent.mid[j]),0)>0)continue;
               var a=points[edge],b=points[(edge+1)%points.length];
               var vertical=Math.abs(a[1]-b[1])>.12;
               if(vertical&&a[1]>b[1]){var swap=a;a=b;b=swap}
@@ -633,7 +552,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         active.forEach(building=>drawPlotDetails(building,head));
       }
       function drawPlotDetails(building,head){
-        if(building.final){drawFactoryDetails(building,head);return;}
         var grow=drawingProgress(building,head),ahead=head[2]-building.z;
         if(grow<=0||ahead>45||ahead< -18)return;
         var leave=1-smoothstep((-ahead-2)/19),x=building.x,z=building.z,w=building.w,d=building.depth;
@@ -666,76 +584,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           strokePath3D(points,rgb(contourBase),leave*.72*path.alpha,path.weight);
         });
       }
-      function drawFactoryDetails(building,head){
-        var grow=drawingProgress(building,head);if(grow<=0)return;
-        if(!building.detailPaths){
-          var paths=[];
-          function line(points,stage,weight,alpha){paths.push({points:points.map(p=>[84-p[2],p[1],-185+p[0]]),stage:stage,weight:weight||.65,alpha:alpha===undefined?1:alpha});}
-          function ring(x,y,z,r,stage){var points=[];for(var k=0;k<=48;k++){var angle=k/48*Math.PI*2;points.push([x+Math.cos(angle)*r,y,z+Math.sin(angle)*r]);}line(points,stage,.65);}
-          // Broad structural bays and four tall loading doors establish a human scale.
-          for(var x=-24;x<=18;x+=7)line([[x,0,.1],[x,20,.1]],.28,.85);
-          for(var y of [6.4,19.5,20])line([[-26,y,.12],[19,y,.12]],.4,.8);
-          for(var x of [-20,-11,10,19]){
-            line([[x-2.6,0,.17],[x-2.6,5.5,.17],[x+2.6,5.5,.17],[x+2.6,0,.17]],.5,1);
-            for(var y=.6;y<5.3;y+=.6)line([[x-2.6,y,.18],[x+2.6,y,.18]],.65,.45);
-          }
-          line([[-3,0,.2],[-3,4.1,.2],[3,4.1,.2],[3,0,.2]],.55,1);
-          line([[0,0,.22],[0,4.1,.22]],.65,.65);
-          // Curved long-span roof ribs, rather than a triangular or rectangular cap.
-          for(var z of [-1.98,-9,-17,-25.98]){
-            var points=[];for(var k=0;k<=48;k++){var angle=k/48*Math.PI;points.push([-3.5-24.5*Math.cos(angle),20+9*Math.sin(angle),z]);}
-            line(points,.55,.85);
-          }
-          // Rounded vessel hoops, access ladders and roof safety railings.
-          for(var tank=0;tank<2;tank++){
-            var x=39+tank*9,top=11+tank*2;
-            for(var y of [.4,top*.4,top*.75,top])ring(x,y,-9,3.44,.6);
-            ring(x,top+1.05,-9,3.2,.7);
-            for(var k=0;k<12;k++){var angle=k/12*Math.PI*2;line([[x+Math.cos(angle)*3.2,top,-9+Math.sin(angle)*3.2],[x+Math.cos(angle)*3.2,top+1.05,-9+Math.sin(angle)*3.2]],.7,.45);}
-            for(var dx of [-.22,.22])line([[x+dx,0,-5.52],[x+dx,top+1.05,-5.52]],.55,.55);
-            for(var y=.4;y<top+.8;y+=.45)line([[x-.22,y,-5.5],[x+.22,y,-5.5]],.7,.4);
-          }
-          // Pipe rack remains outside the hall with a six-metre entrance gap.
-          for(var side of [-1,1]){
-            var begin=side<0?-26:6,end=side<0?-6:26;
-            for(var y of [6.05,6.4,6.75])line([[begin,y,6.3],[end,y,6.3]],.6,.85);
-            for(var x=begin;x<=end;x+=2){line([[x,5.8,6.3],[x,7.1,6.3]],.68,.45);}
-            line([[begin,7.1,6.3],[end,7.1,6.3]],.7,.5);
-          }
-          // Service pipes use broad, rounded elbows to connect the tank yard.
-          for(var y of [2.2,2.65]){
-            var pipe=[[28,y,6.3],[37,y,6.3]];
-            for(var k=1;k<=12;k++){var angle=k/12*Math.PI/2;pipe.push([37+2*Math.sin(angle),y,4.3+2*Math.cos(angle)]);}
-            pipe.push([39,y,-5.5]);line(pipe,.65,.8);
-          }
-          // Forecourt: short fencing, parking/loading marks and slender light poles.
-          for(var side of [-1,1]){
-            var inner=side*8,outer=side*31;
-            for(var z of [10,17])line([[inner,0,z],[outer,0,z]],.45,.55,.6);
-            for(var x=10;x<=30;x+=5)line([[side*x,0,10],[side*x,0,17]],.6,.45,.55);
-            for(var x of [9,15,21,27]){
-              line([[side*x,0,20],[side*x,1.2,20]],.55,.7);
-            }
-            line([[side*9,.55,20],[side*27,.55,20]],.65,.5);
-            for(var x of [12,29]){
-              var sx=side*x;
-              line([[sx,0,13],[sx,7,13],[sx-side*.35,7.6,13],[sx-side*1.8,7.6,13]],.55,.75);
-              line([[sx-side*1.4,7.5,13],[sx-side*2.2,7.5,13]],.7,1.5);
-            }
-          }
-          // Stack collars and a small service platform complete the upper silhouette.
-          for(var stack=0;stack<2;stack++){
-            var x=-20+stack*6,top=stack?43:47;
-            for(var y of [25,top-1,top])ring(x,y,-22,1.18,.7);
-          }
-          building.detailPaths=paths;
-        }
-        building.detailPaths.forEach(function(path){
-          var points=partialPath3D(path.points,smoothstep((grow-path.stage)/.3));
-          strokePath3D(points,rgb(contourHalo),.2,2);
-          strokePath3D(points,rgb(contourBase),.82*path.alpha,path.weight);
-        });
-      }
       var lanes=[-1,0,1], colors=['#ff3848','#347fff','#ffffff'];
       function draw(){
         strokeCache=new WeakMap();
@@ -750,10 +598,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           for(var k=start;k<end;k+=.65){
             var v=at(k),spread=Math.min(1,...stops.map(stop=>Math.hypot(v[0]-stop.socket[0],v[2]-stop.front)/2.8));
             if(k<0){v[1]+=(-k)*.035;v[2]+=(-k)*.12}
-            var turn=smoothstep((k-originalRouteEnd)/90),a=at(k-1),b=at(k+1);
-            var dx=b[0]-a[0],dz=b[2]-a[2],length=Math.hypot(dx,dz)||1;
-            var nx=1-turn+(-dz/length)*turn,nz=(dx/length)*turn;
-            line.push([v[0]+nx*lane*.34*spread,v[1]+lane*.12*spread,v[2]+nz*lane*.34*spread]);
+            line.push([v[0]+lane*.34*spread,v[1]+lane*.12*spread,v[2]]);
           }
           var color=colors[laneIndex];
           ctx.save();ctx.globalCompositeOperation='source-over';

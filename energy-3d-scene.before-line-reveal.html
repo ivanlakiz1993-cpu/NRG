@@ -278,12 +278,12 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       }
       for(var block=0;block<12;block++)for(var side=-1;side<=1;side+=2){
         var z=8-block*14.5+(side===1?-6.5:0),center=routeCenter(z);
-        var w=(4.4+(block%3)*.85)*1.85,depth=(4.6+(block%3)*.7)*1.5;
+        var w=(4.4+(block%3)*.85)*1.55,depth=(4.6+(block%3)*.7)*1.35;
         var corridor=[routeCenter(z+4),routeCenter(z),routeCenter(z-depth-4),routeCenter(z-22)*.88,routeCenter(z-depth-22)*.88];
         var edge=side<0?Math.min(...corridor):Math.max(...corridor);
         var x=edge+side*(7+w*.5+(block%2)*.8);
-        var h=(7+(block*5+(side===1?4:0))%10)*2.2;
-        streetscape.push({x:x,z:z,w:w,depth:depth,h:h,side:side,variant:(block+(side===1?3:0))%8,seed:block*1.37+side});
+        var h=(7+(block*5+(side===1?4:0))%10)*1.8;
+        streetscape.push({x:x,z:z,w:w,depth:depth,h:h,side:side,variant:(block+(side===1?3:0))%6,seed:block*1.37+side});
       }
       function makeArchitecture(building){
         var faces=[],x=building.x,z=building.z,w=building.w,d=building.depth,h=building.h;
@@ -302,16 +302,14 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             var j=(i+1)%footprint.length,points=[bottom[i],bottom[j],top[j],top[i]],windows=[];
             var span=Math.hypot(bottom[j][0]-bottom[i][0],bottom[j][2]-bottom[i][2]);
             if(detail&&span>.55){
-              var windowStyle=building.variant%4;
-              var rows=Math.max(1,Math.floor((Math.min(tops[i],tops[j])-y0-.7)/(windowStyle===3?2.7:2.1)));
-              var cols=Math.max(1,Math.floor(span/(windowStyle===2?3.2:windowStyle===1?1.25:1.8)));
+              var rows=Math.max(1,Math.floor((Math.min(tops[i],tops[j])-y0-.7)/1.65));
+              var cols=Math.max(1,Math.floor(span/(building.variant===4?1.1:1.45)));
               for(var row=0;row<rows;row++)for(var col=0;col<cols;col++){
-                var inset=windowStyle===1?.34:windowStyle===2?.08:.22;
-                var t0=(col+inset)/cols,t1=(col+1-inset)/cols;
-                var wy=y0+.6+row*(Math.min(tops[i],tops[j])-y0-.9)/rows,wh=(Math.min(tops[i],tops[j])-y0-.9)/rows*(windowStyle===1?.78:windowStyle===2?.38:.57);
+                var t0=(col+.23)/cols,t1=(col+.77)/cols;
+                var wy=y0+.6+row*(Math.min(tops[i],tops[j])-y0-.9)/rows,wh=(Math.min(tops[i],tops[j])-y0-.9)/rows*.51;
                 var ax=bottom[i][0]+(bottom[j][0]-bottom[i][0])*t0,az=bottom[i][2]+(bottom[j][2]-bottom[i][2])*t0;
                 var bx=bottom[i][0]+(bottom[j][0]-bottom[i][0])*t1,bz=bottom[i][2]+(bottom[j][2]-bottom[i][2])*t1;
-                windows.push({points:[[ax,wy,az],[bx,wy,bz],[bx,wy+wh,bz],[ax,wy+wh,az]],row:row,col:col,style:windowStyle});
+                windows.push({points:[[ax,wy,az],[bx,wy,bz],[bx,wy+wh,bz],[ax,wy+wh,az]],row:row,col:col});
               }
             }
             face(points,windows);
@@ -344,27 +342,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           var footprint=[];for(var k=0;k<14;k++){var angle=k/14*Math.PI*2;footprint.push([Math.cos(angle)*w*.52,-d*.5+Math.sin(angle)*d*.5])}
           prism(footprint,0,h,true);
           var crown=footprint.map(p=>[p[0]*.78,-d*.5+(p[1]+d*.5)*.78]);prism(crown,h,h+.65,false);
-        }else if(building.variant===6){
-          // Heavy industrial hall, attached administration wing and a pair of tall flues.
-          box(-w*.8,w*.8,0,h*.34,0,-d);
-          box(-w*.75,-w*.25,h*.34,h*.56,-d*.35,-d);
-          box(w*.2,w*.62,h*.34,h*.34+.9,-1.3,-d+1.3,true);
-          for(var stack=0;stack<2;stack++){
-            var sx=-w*.03+stack*w*.28,foot=[];
-            for(var k=0;k<10;k++){var angle=k/10*Math.PI*2;foot.push([sx+Math.cos(angle)*.44,-d*.72+Math.sin(angle)*.44])}
-            prism(foot,h*.34,h*(stack?.82:1.03),false);
-            var cap=foot.map(p=>[sx+(p[0]-sx)*1.18,-d*.72+(p[1]+d*.72)*1.18]);prism(cap,h*(stack?.82:1.03)-.2,h*(stack?.82:1.03)+.12,false);
-          }
-        }else if(building.variant===7){
-          // Process plant: cylindrical storage tanks, a pump house and a connecting service bridge.
-          box(-w*.75,w*.7,0,h*.18,.2,-d,false);
-          for(var tank=0;tank<3;tank++){
-            var sx=-w*.48+tank*w*.47,foot=[];
-            for(var k=0;k<12;k++){var angle=k/12*Math.PI*2;foot.push([sx+Math.cos(angle)*w*.18,-d*.5+Math.sin(angle)*d*.34])}
-            var th=h*(tank===1?.67:.49);prism(foot,h*.18,th,true);
-            var cap=foot.map(p=>[sx+(p[0]-sx)*.92,-d*.5+(p[1]+d*.5)*.92]);prism(cap,th,th+.35,false);
-          }
-          box(-w*.6,w*.6,h*.29,h*.32,-.45,-1.05,false);
         }else{
           // Broad commercial block, recessed entrance volume and an asymmetric upper wing.
           box(-w*.64,w*.64,0,h*.48,0,-d);
@@ -374,7 +351,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         return faces;
       }
       streetscape.forEach(b=>b.faces=makeArchitecture(b));
-      function drawingProgress(building,head){
+      function riseProgress(building,head){
         if(reduceMotion)return scrollProgress>.001?1:0;
         var opening=smoothstep((scrollProgress-.008)/.055);
         var distance=head[2]-building.z;
@@ -382,37 +359,37 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var rise=smoothstep((38-distance-stagger)/17);
         return opening*rise;
       }
-      function partialPath3D(points,amount){
-        if(amount<=0||points.length<2)return [];
-        if(amount>=1)return points;
-        var lengths=points.slice(1).map((p,i)=>Math.hypot(...p.map((v,j)=>v-points[i][j])));
-        var remaining=lengths.reduce((a,b)=>a+b,0)*amount,out=[points[0]];
-        for(var i=0;i<lengths.length;i++){
-          if(remaining>=lengths[i]){out.push(points[i+1]);remaining-=lengths[i]}
-          else{var t=remaining/(lengths[i]||1);out.push(points[i].map((v,j)=>v+(points[i+1][j]-v)*t));break}
+      function clipAtGround(points){
+        var output=[];
+        for(var i=0;i<points.length;i++){
+          var a=points[i],b=points[(i+1)%points.length],inside=a[1]>=0,nextInside=b[1]>=0;
+          if(inside)output.push(a);
+          if(inside!==nextInside){var t=-a[1]/(b[1]-a[1]);output.push([a[0]+(b[0]-a[0])*t,0,a[2]+(b[2]-a[2])*t])}
         }
-        return out;
+        return output;
       }
       function drawStreetscape(head){
         var time=reduceMotion?0:performance.now()*.00035;
         var ordered=streetscape.slice().sort((a,b)=>a.z-b.z);
         ordered.forEach(function(building){
-          var ahead=head[2]-building.z,grow=drawingProgress(building,head),leave=1-smoothstep((-ahead-2)/19);
+          var ahead=head[2]-building.z,grow=riseProgress(building,head),leave=1-smoothstep((-ahead-2)/19);
           if(grow<=0||leave<=0||building.z>cameraZ-4)return;
           var roofHeight=Math.max(...building.faces.flatMap(f=>f.points.map(p=>p[1])));
-          // Geometry stays fixed: only the length of each architectural stroke changes.
-          var visible=building.faces.filter(f=>f.normal[0]*(cameraX-f.mid[0])+f.normal[1]*(cameraY-f.mid[1])+f.normal[2]*(cameraZ-f.mid[2])>0);
+          // Translate full-size geometry from below the ground rather than squashing it into a miniature.
+          var lift=(1-grow)*(roofHeight+.65);
+          var visible=building.faces.filter(f=>f.normal[0]*(cameraX-f.mid[0])+f.normal[1]*(cameraY-(f.mid[1]-lift))+f.normal[2]*(cameraZ-f.mid[2])>0);
           visible.sort((a,b)=>{
             function depth(f){return (f.mid[0]-cameraX)*cameraForward[0]+(f.mid[1]-cameraY)*cameraForward[1]+(f.mid[2]-cameraZ)*cameraForward[2]}
             return depth(b)-depth(a);
           });
           var fade=(.55+.45*(1-smoothstep((ahead-8)/62)))*Math.min(1,grow*6)*leave;
           visible.forEach(function(face,faceIndex){
-            var points=face.points;
+            var transform=p=>[p[0],p[1]-lift,p[2]];
+            var points=clipAtGround(face.points.map(transform));
             if(points.length<3)return;
             var projected=points.map(p=>projectInto(...p,{}));if(projected.some(p=>!p.visible))return;
-            ctx.save();ctx.globalAlpha=smoothstep((grow-.35)/.4);maskArchitecture(points);ctx.restore();
-            fillPolygon3D(points,rgb([65,83,108],face.normal[1]>0?.025:.04),null,smoothstep((grow-.55)/.4)*leave);
+            maskArchitecture(points);
+            fillPolygon3D(points,rgb([65,83,108],face.normal[1]>0?.025:.04),null,Math.min(1,grow*6)*leave);
             // A travelling, continuous light band sweeps across the complete facade.
             // Its phase never resets: scrolling adds motion without a blinking loop seam.
             var screenX=projected.reduce((n,p)=>n+p.x,0)/projected.length;
@@ -428,142 +405,20 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               gradient.addColorStop(t,rgb(mixColor(neutralBase,neutralGlint,wave)));
             }
             ctx.save();ctx.globalCompositeOperation='source-over';
-            // Trace ground-level edges first, then uprights, then roof lines.
-            for(var edge=0;edge<points.length;edge++){
-              var a=points[edge],b=points[(edge+1)%points.length];
-              var vertical=Math.abs(a[1]-b[1])>.12;
-              if(vertical&&a[1]>b[1]){var swap=a;a=b;b=swap}
-              var low=Math.min(a[1],b[1])/roofHeight;
-              var begin=vertical?.13+low*.22:(low<.02?0:.4+low*.13);
-              var duration=vertical?.43:(low<.02?.22:.25);
-              var amount=smoothstep((grow-begin)/duration);
-              var path=partialPath3D([a,b],amount);
-              if(path.length<2)continue;
-              strokePath3D(path,'#06101e',fade*contourTransition*.3,2.5);
-              strokePath3D(path,'#f4f8ff',fade*contourTransition*.2,1.5);
-              strokePath3D(path,rgb(contourHalo),fade*.22,2.1);
-              strokePath3D(path,gradient,fade,.95);
-            }
+            // Two quiet opposite underlays keep edges readable during the crossfade.
+            strokePath3D(points.concat([points[0]]),'#06101e',fade*contourTransition*.3,2.5);
+            strokePath3D(points.concat([points[0]]),'#f4f8ff',fade*contourTransition*.2,1.5);
+            strokePath3D(points.concat([points[0]]),rgb(contourHalo),fade*.22,2.1);
+            strokePath3D(points.concat([points[0]]),gradient,fade,.95);
             face.windows.forEach(function(pane){
-              var points=pane.points;
-              var floor=points[0][1]/roofHeight;
-              var amount=smoothstep((grow-.5-floor*.18-(pane.col%4)*.012)/.25);
-              if(amount<=0)return;
+              var p=clipAtGround(pane.points.map(transform));if(p.length<3)return;
               var light=smoothstep((building.z-head[2]-.07*pane.row-.04*pane.col)/1.4);
-              if(light>0&&amount>.95)fillPolygon3D(points,rgb(contourBase,light*(.5+.12*(.5+.5*Math.sin(building.seed+pane.row*1.7+pane.col*2.3)))),null,smoothstep((amount-.95)/.05)*leave);
-              var path=partialPath3D(points.concat([points[0]]),amount);
-              strokePath3D(path,'#07101e',fade*contourTransition*.22,1.5);
-              strokePath3D(path,gradient,fade*.92,.65);
-              if(amount>.95&&(pane.style===0||pane.style===3)){
-                var a=pane.points[0],b=pane.points[1],c=pane.points[2],d=pane.points[3];
-                var mid=(p,q)=>p.map((v,i)=>(v+q[i])*.5);
-                strokePath3D(partialPath3D([mid(a,b),mid(d,c)],smoothstep((amount-.95)/.05)),gradient,fade*.55,.4);
-                if(pane.style===3)strokePath3D([mid(a,d),mid(b,c)],gradient,fade*.55,.4);
-              }
+              if(light>0)fillPolygon3D(p,rgb(contourBase,light*(.5+.12*(.5+.5*Math.sin(building.seed+pane.row*1.7+pane.col*2.3)))),null,grow*leave);
+              strokePath3D(p.concat([p[0]]),'#07101e',fade*contourTransition*.22,1.5);
+              strokePath3D(p.concat([p[0]]),gradient,fade*.92,.65);
             });
             ctx.restore();
           });
-          drawPlotDetails(building,head);
-        });
-      }
-      function makeDetailedTree(x,z,seed){
-        var state=(Math.abs(Math.floor(seed*997))+17)>>>0,paths=[];
-        function random(){state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296}
-        var h=4.8+random()*1.8,lean=(random()-.5)*.45;
-        function P(dx,y,dz){return [x+dx,y,z+dz]}
-        function path(points,weight,stage,alpha,fine){paths.push({points:points,weight:weight,stage:stage,alpha:alpha===undefined?1:alpha,fine:!!fine})}
-        // Tapered trunk with an irregular bark contour and flared root collar.
-        var trunk=[P(-.2,0,0),P(-.115,.55,-.02),P(-.1+lean*.3,h*.25,.03),P(-.055+lean*.7,h*.48,0),P(lean,h*.66,-.04),P(.065+lean*.7,h*.48,.02),P(.11+lean*.3,h*.25,.03),P(.12,.55,.02),P(.21,0,.01)];
-        path(trunk,1.05,.15,.96);
-        for(var root=0;root<5;root++){var a=random()*Math.PI*2,r=.28+random()*.25;path([P(0,.24,0),P(Math.cos(a)*r,0,Math.sin(a)*r),P(Math.cos(a)*(r+.12),0,Math.sin(a)*(r+.12))],.55,.2,.7)}
-        for(var bark=0;bark<6;bark++){var dx=(random()-.5)*.15,yy=.2+random()*h*.22;path([P(dx,yy,.04),P(dx+.025,yy+h*.12,.035),P(dx+lean*.3,yy+h*.28,.03)],.35,.35,.4,true)}
-        function tuft(centre,radius){
-          var turn=random()*Math.PI*2,cos=Math.cos(turn),sin=Math.sin(turn);
-          function T(u,v,w){return [centre[0]+u*cos-w*sin,centre[1]+v,centre[2]+u*sin+w*cos]}
-          var shape=[];
-          for(var k=0;k<=28;k++){
-            var a=k/28*Math.PI*2;
-            var r=radius*(1+.13*Math.sin(a*5+turn)+.075*Math.sin(a*9+turn*.6));
-            shape.push(T(Math.cos(a)*r,Math.sin(a)*r*.9,.1*Math.sin(a*3)*radius));
-          }
-          path(shape,.52,.48,.78);
-          // Broken interior contours describe separate bunches instead of transparent ellipses.
-          for(var bunch=0;bunch<3;bunch++){
-            var arc=[],shift=(random()-.5)*radius;
-            for(var k=0;k<=9;k++){var a=-.9+k/9*2.4;arc.push(T(Math.cos(a)*radius*.55+shift,Math.sin(a)*radius*.5,random()*.03))}
-            path(arc,.35,.61,.35,true);
-          }
-          // Lens-shaped leaves and their short central veins, visible only near the camera.
-          for(var leaf=0;leaf<9;leaf++){
-            var a=random()*Math.PI*2,r=Math.sqrt(random())*radius*.82,u=Math.cos(a)*r,v=Math.sin(a)*r*.8;
-            var angle=random()*Math.PI*2,len=.09+random()*.08,wide=len*.38;
-            var du=Math.cos(angle),dv=Math.sin(angle);
-            var points=[T(u-du*len,v-dv*len,0),T(u-dv*wide,v+du*wide,.02),T(u+du*len,v+dv*len,0),T(u+dv*wide,v-du*wide,-.02),T(u-du*len,v-dv*len,0)];
-            path(points,.3,.68,.42,true);
-            path([points[0],points[2]],.24,.75,.28,true);
-          }
-        }
-        function branch(start,angle,len,level){
-          var end=[start[0]+Math.cos(angle)*len*.8,start[1]+len*(.65+random()*.28),start[2]+Math.sin(angle)*len*.7];
-          var mid=start.map((v,i)=>(v+end[i])*.5);mid[0]+=(random()-.5)*.12;mid[2]+=(random()-.5)*.1;
-          path([start,mid,end],.35+level*.19,.24+(3-level)*.08,.88);
-          if(level>1){
-            branch(end,angle-.58-random()*.25,len*.63,level-1);
-            branch(end,angle+.55+random()*.3,len*.58,level-1);
-          }else tuft(end,.42+random()*.28);
-        }
-        for(var limb=0;limb<6;limb++){
-          var y=h*(.32+limb*.065),start=P(lean*y/h,y,0);
-          branch(start,limb*2.4+random()*.45,h*(.22+random()*.075),3);
-        }
-        tuft(P(lean,h*.97,0),.65);
-        return {paths:paths};
-      }
-      function drawPlotDetails(building,head){
-        var grow=drawingProgress(building,head),ahead=head[2]-building.z;
-        if(grow<=0||ahead>45||ahead< -18)return;
-        var leave=1-smoothstep((-ahead-2)/19),x=building.x,z=building.z,w=building.w,d=building.depth;
-        var inner=x-building.side*(w*.5+1.15),paths=[];
-        function detail(points,stage,weight,alpha){paths.push({points:points,stage:stage,weight:weight||.65,alpha:alpha===undefined?1:alpha})}
-        // A fine fence along the inward plot boundary, with vertical posts and two rails.
-        var fenceX=x-building.side*(w*.5+.4);
-        if(building.variant===2||building.variant>=6||Math.abs(building.seed)%3<1.3){
-          for(var v=.5;v>=-d-.5;v-=1.05)detail([[fenceX,0,z+v],[fenceX,1.1,z+v]],.1,.55);
-          for(var y of [.35,.95])detail([[fenceX,y,z+.5],[fenceX,y,z-d-.5]],.2,.6);
-          // Recessed entrance gate and horizontal sign plate.
-          var gx=x-w*.32;
-          detail([[gx,0,z+.65],[gx,1.65,z+.65],[gx+w*.55,1.65,z+.65],[gx+w*.55,0,z+.65]],.35,.7);
-          detail([[gx,1.34,z+.65],[gx+w*.55,1.34,z+.65]],.48,.4);
-        }
-        if(building.variant<6&&building.variant!==2){
-          // Cache botanical geometry: trunks, tapered branching, irregular foliage and individual leaves.
-          if(!building.trees){
-            building.trees=[];
-            for(var n=0;n<2;n++)building.trees.push(makeDetailedTree(inner-building.side*.25,z-1.1-n*d*.62,building.seed*71+n*123));
-          }
-          building.trees.forEach(function(tree){
-            tree.paths.forEach(function(path){
-              var centre=projectInto(...path.points[0],{});
-              if(!centre.visible)return;
-              if(path.fine&&centre.scale<22)return;
-              detail(path.points,path.stage,path.weight,path.alpha);
-            });
-          });
-        }else{
-          // Service ladders and external pipework distinguish industrial plots.
-          var lx=x+w*.68,hh=building.h*.32;
-          for(var dx of [0,.35])detail([[lx+dx,0,z+.12],[lx+dx,hh+.35,z+.12]],.3,.5);
-          for(var y=.3;y<hh+.35;y+=.4)detail([[lx,y,z+.12],[lx+.35,y,z+.12]],.5,.4);
-          for(var y of [hh*.55,hh*.55+.15])detail([[x-w*.65,y,z+.16],[x+w*.48,y,z+.16],[x+w*.48,hh*.85,z+.16]],.4,.6);
-        }
-        // Low plinth and two shallow steps anchor the building to the same ground plane.
-        detail([[x-w*.3,0,z+.7],[x-w*.3,.16,z+.7],[x+w*.3,.16,z+.7],[x+w*.3,0,z+.7]],.12,.55);
-        detail([[x-w*.27,.16,z+.45],[x+w*.27,.16,z+.45]],.2,.45);
-        paths.forEach(function(path){
-          var amount=smoothstep((grow-path.stage)/.3);if(amount<=0)return;
-          var points=partialPath3D(path.points,amount);
-          strokePath3D(points,rgb(contourHalo),leave*.1,1.5);
-          strokePath3D(points,rgb(contourBase),leave*.72*path.alpha,path.weight);
         });
       }
       var lanes=[-1,0,1], colors=['#ff3848','#347fff','#ffffff'];
