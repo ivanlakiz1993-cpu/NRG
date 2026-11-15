@@ -8,3 +8,4 @@ Thumbs.db
 .*.cjs
 energy-3d-scene.before-*.html
 energy-*.jpg
+/energy-industrial-*.png

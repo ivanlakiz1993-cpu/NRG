@@ -448,6 +448,52 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             prism(foot,0,11+tank*2,false);
             var cap=foot.map(p=>[sx+(p[0]-sx)*.92,-9+(p[1]+9)*.92]);prism(cap,11+tank*2,11.5+tank*2,false);
           }
+          // Technical forecourt volumes flank the approach, outside the route and camera corridor.
+          function surface(points,centre){
+            var u=points[1].map((v,i)=>v-points[0][i]),v=points[2].map((v,i)=>v-points[0][i]);
+            var normal=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
+            var mid=points.reduce((sum,p)=>sum.map((n,i)=>n+p[i]/points.length),[0,0,0]);
+            if(normal.reduce((sum,n,i)=>sum+n*(mid[i]-centre[i]),0)<0)normal=normal.map(n=>-n);
+            var face={points:points,normal:normal,mid:mid,windows:[]};faces.push(face);return face;
+          }
+          function curvedSkin(rings,centre){
+            for(var level=0;level<rings.length-1;level++){
+              var band=[];
+              for(var k=0;k<32;k++){var next=(k+1)%32;band.push(surface([rings[level][k],rings[level][next],rings[level+1][next],rings[level+1][k]],centre));}
+              band.forEach(function(f,k){f.curvedEdges={1:band[(k+1)%32],3:band[(k+31)%32]};});
+            }
+          }
+          function coolingTower(cx,cz,height){
+            var profile=[[0,5.5],[2,5.1],[height*.48,3.35],[height*.85,4.1],[height,4.8]];
+            var rings=profile.map(p=>Array.from({length:32},(_,k)=>{var a=k/32*Math.PI*2;return [cx+Math.cos(a)*p[1],p[0],cz+Math.sin(a)*p[1]];}));
+            curvedSkin(rings,[cx,height*.5,cz]);
+            var outer=rings[rings.length-1],inner=outer.map(p=>[cx+(p[0]-cx)*.94,height-.35,cz+(p[2]-cz)*.94]);
+            for(var k=0;k<32;k++)surface([outer[k],outer[(k+1)%32],inner[(k+1)%32],inner[k]],[cx,height*.5,cz]);
+          }
+          coolingTower(0,116,24);coolingTower(-3,99,20);
+          roundBox(-31,-17,0,6.4,60,46,1.7,true);
+          for(var sx of [-30,-22,-14]){
+            var foot=Array.from({length:32},(_,k)=>{var a=k/32*Math.PI*2;return [sx+Math.cos(a)*2.7,27+Math.sin(a)*2.7];});
+            prism(foot,1.8,16,false);
+            var roof=foot.map(p=>[sx+(p[0]-sx)*.82,27+(p[1]-27)*.82]);prism(roof,16,17.1,false);
+            for(var dx of [-1.8,1.8])for(var dz of [-1.8,1.8])box(sx+dx-.13,sx+dx+.13,0,1.9,27+dz+.13,27+dz-.13,false);
+          }
+          // Electrical yard: a control cabin and three transformer plinths with cooling fins.
+          roundBox(25,34,0,5.6,50,42,1.1,true);
+          for(var sx of [21,27,33]){
+            box(sx-1.9,sx+1.9,0,.45,38,33,false);
+            roundBox(sx-1.45,sx+1.45,.45,3.6,37.2,33.8,.45,false);
+            for(var fin=-1;fin<=1;fin+=.4)box(sx+fin-.05,sx+fin+.05,.8,3.1,37.65,37.2,false);
+          }
+          // Capsule-shaped pressure vessel on two concrete saddles.
+          var vesselRings=[[20,.25],[21,1.8],[23,2],[33,2],[35,1.8],[36,.25]].map(p=>Array.from({length:32},(_,k)=>{var a=k/32*Math.PI*2;return [20+Math.cos(a)*p[1],3.6+Math.sin(a)*p[1],p[0]];}));
+          curvedSkin(vesselRings,[20,3.6,28]);
+          for(var sz of [24,32])box(18.5,21.5,0,1.85,sz+.5,sz-.5,false);
+          // Separate longitudinal racks frame the turn without spanning the central passage.
+          for(var sx of [-15,15]){
+            for(var sz of [36,46,56,66])box(sx-.18,sx+.18,0,7,sz+.18,sz-.18,false);
+            box(sx-.35,sx+.35,6.7,7.1,66.2,35.8,false);
+          }
           // Elevated pipe rack set in front of the hall, with a clear central entrance.
           for(var sx of [-25,-15,15,25])box(sx-.18,sx+.18,0,5.8,6.6,6.1,false);
           box(-26,-6,5.5,5.8,6.8,5.9,false);box(6,26,5.5,5.8,6.8,5.9,false);
@@ -522,7 +568,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         b.bounds={minX:Math.min(...vertices.map(p=>p[0])),maxX:Math.max(...vertices.map(p=>p[0])),minZ:Math.min(...vertices.map(p=>p[2])),maxZ:Math.max(...vertices.map(p=>p[2]))};
       });
       function drawingProgress(building,head){
-        if(building.final)return smoothstep((scrollProgress*(route.length-1)-originalRouteEnd-25)/130);
+        if(building.final)return smoothstep((scrollProgress*(route.length-1)-originalRouteEnd+25)/150);
         if(reduceMotion)return scrollProgress>.001?1:0;
         var opening=smoothstep((scrollProgress-.008)/.055);
         var distance=head[2]-building.z;
@@ -722,6 +768,57 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               line([[sx,0,13],[sx,7,13],[sx-side*.35,7.6,13],[sx-side*1.8,7.6,13]],.55,.75);
               line([[sx-side*1.4,7.5,13],[sx-side*2.2,7.5,13]],.7,1.5);
             }
+          }
+          // Cooling-tower collars, inspection decks and diagonal lower supports.
+          for(var tower of [[0,116,24],[-3,99,20]]){
+            var tx=tower[0],tz=tower[1],th=tower[2];
+            for(var level of [[0,5.55],[2,5.15],[th*.48,3.4],[th*.85,4.15],[th,4.85],[th+.8,4.95]])ring(tx,level[0],tz,level[1],.2);
+            for(var k=0;k<16;k++){
+              var a=k/16*Math.PI*2,b=a+Math.PI/16;
+              line([[tx+Math.cos(a)*5.6,0,tz+Math.sin(a)*5.6],[tx+Math.cos(b)*5.15,2,tz+Math.sin(b)*5.15]],.22,.65);
+              line([[tx+Math.cos(a)*4.95,th,tz+Math.sin(a)*4.95],[tx+Math.cos(a)*4.95,th+.8,tz+Math.sin(a)*4.95]],.5,.45);
+            }
+            for(var dx of [-.22,.22])line([[tx+dx,0,tz+5.65],[tx+dx,th*.48,tz+3.48],[tx+dx,th,tz+4.88]],.4,.55);
+          }
+          // Silo seams and roof guards, with a common transfer conveyor behind the vessels.
+          for(var sx of [-30,-22,-14]){
+            for(var y of [2,7,12,16])ring(sx,y,27,2.74,.4);
+            ring(sx,17.7,27,2.1,.65);
+            for(var k=0;k<10;k++){var a=k/10*Math.PI*2;line([[sx+Math.cos(a)*2.1,17.1,27+Math.sin(a)*2.1],[sx+Math.cos(a)*2.1,17.7,27+Math.sin(a)*2.1]],.65,.4);}
+            for(var dx of [-.2,.2])line([[sx+dx,1.8,29.8],[sx+dx,17.7,29.8]],.45,.55);
+            for(var y=2;y<17.5;y+=.55)line([[sx-.2,y,29.82],[sx+.2,y,29.82]],.65,.4);
+          }
+          for(var y of [15.6,16.2])line([[-32,y,23.8],[-12,y,23.8]],.6,.65);
+          for(var sx=-32;sx<=-12;sx+=2)line([[sx,15.6,23.8],[sx+2,16.2,23.8]],.65,.4);
+          // Insulator stacks, bus bars and access fencing distinguish the electrical yard.
+          for(var sx of [21,27,33]){
+            for(var sz of [34.6,36.3]){
+              line([[sx,3.6,sz],[sx,5.6,sz]],.45,.7);
+              for(var y=3.8;y<5.4;y+=.25)ring(sx,y,sz,.22,.55);
+            }
+          }
+          for(var sz of [34.6,36.3])line([[21,5.6,sz],[33,5.6,sz]],.6,.8);
+          for(var sx=18;sx<=36;sx+=2)line([[sx,0,31.5],[sx,1.7,31.5]],.4,.5);
+          for(var y of [.5,1.5])line([[18,y,31.5],[36,y,31.5]],.55,.55);
+          // Capsule vessel hoops and a pressure gauge on its top service connection.
+          for(var sz of [23.1,28,32.9]){
+            var hoop=[];for(var k=0;k<=40;k++){var a=k/40*Math.PI*2;hoop.push([20+Math.cos(a)*2.04,3.6+Math.sin(a)*2.04,sz]);}line(hoop,.45,.6);
+          }
+          line([[20,5.6,28],[20,6.4,28]],.55,.7);
+          var gauge=[];for(var k=0;k<=24;k++){var a=k/24*Math.PI*2;gauge.push([20+Math.cos(a)*.32,6.7+Math.sin(a)*.32,28]);}line(gauge,.65,.65);
+          // Longitudinal pipe runs terminate at the forecourt racks and stay clear of the entrance.
+          for(var sx of [-15,15]){
+            for(var dx of [-.24,0,.24])line([[sx+dx,7.35,36],[sx+dx,7.35,66]],.35,.7);
+            for(var sz of [36,46,56,66]){
+              line([[sx-.6,7.1,sz],[sx+.6,7.1,sz]],.4,.6);
+              line([[sx,0,sz],[sx,2.5,sz+2]],.5,.45);
+            }
+          }
+          // Louvred compressor intake and three motor housings outside the pump station.
+          for(var x=-29;x<-18;x+=.6)line([[x,1,60.08],[x,4,60.08]],.55,.45);
+          for(var sx of [-29,-24,-19]){
+            line([[sx,0,43],[sx,2,43],[sx+2.5,2,43],[sx+2.5,0,43]],.5,.65);
+            line([[sx,1.6,43],[sx+2.5,1.6,43]],.65,.4);
           }
           // Stack collars and a small service platform complete the upper silhouette.
           for(var stack=0;stack<2;stack++){
