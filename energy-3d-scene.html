@@ -823,7 +823,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           var turn=smoothstep((k-originalRouteEnd)/90),a=at(k-1),b=at(k+1);
           var dx=b[0]-a[0],dz=b[2]-a[2],length=Math.hypot(dx,dz)||1;
           var nx=1-turn+(-dz/length)*turn,nz=(dx/length)*turn;
-          line.push([v[0]+nx*lane*.34*spread,v[1]+lane*.12*spread,v[2]+nz*lane*.34*spread]);
+          var braid=k*.055+(lane+1)*Math.PI*2/3,weave=.46*Math.sin(braid)*spread;
+          line.push([v[0]+nx*(lane*.34*spread+weave),v[1]+lane*.12*spread+.09*Math.cos(braid)*spread,v[2]+nz*(lane*.34*spread+weave)]);
         }
         return line;
       }
@@ -870,16 +871,16 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       }
       function drawElectricity(ribbons,time){
         if(reduceMotion)return;
-        // Several overlapping plasma filaments keep the conductor continuously charged.
+        // One travelling leader per wire; phases and directions remain independent.
         ribbons.forEach(function(line,lane){
-          var count=lane===1?4:3;
-          var speeds=[.108,-.084,.076],offsets=[.11,.56,.82];
+          var count=1;
+          var speeds=[.19,-.15,.12],offsets=[.08,.49,.81];
           for(var packet=0;packet<count;packet++){
             var seed=lane*7.31+packet*4.17;
-            var phase=(time*(speeds[lane]+(packet%2)*.009)+packet/count+offsets[lane])%1;
+            var phase=(time*speeds[lane]+offsets[lane])%1;
             phase=(phase+1)%1;
-            var opacity=(.48+.28*(.5+.5*Math.sin(time*3.1+seed)))*.84;
-            var start=phase*(line.length-1),span=(.24+.045*Math.sin(seed))*(line.length-1),points=[];
+            var opacity=(.48+.28*(.5+.5*Math.sin(time*(2.5+lane*.7)+seed)))*.84;
+            var span=(.2+.025*Math.sin(seed))*(line.length-1),start=phase*(line.length-1-span),points=[];
             for(var j=0;j<=54;j++){
               var t=j/54,index=start+span*t,p=ribbonPoint(line,index),a=ribbonPoint(line,index-1),b=ribbonPoint(line,index+1);
               var length=Math.hypot(b[0]-a[0],b[2]-a[2])||1,nx=-(b[2]-a[2])/length,nz=(b[0]-a[0])/length;
@@ -889,7 +890,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               p[0]+=nx*offset;p[2]+=nz*offset;
               p[1]+=envelope*(.1*Math.sin(t*47+seed+time*1.4)+.045*Math.sin(t*113-seed-time*1.8));points.push(p);
             }
-            dischargeStroke(points,opacity*(packet===0?.92:.58));
+            var edgeFade=Math.pow(Math.sin(phase*Math.PI),.35);
+            dischargeStroke(points,opacity*edgeFade);
             // Fine, branching leaders flicker away from the bright central plasma.
             var branchCount=packet===0?9:5;
             for(var branch=0;branch<branchCount;branch++){
