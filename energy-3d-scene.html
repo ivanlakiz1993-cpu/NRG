@@ -832,44 +832,60 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         return a.map((v,j)=>v+(b[j]-v)*t);
       }
       function dischargeStroke(points,opacity){
-        if(opacity<.008)return;
-        var halo=mixColor([164,192,224],[150,169,193],backgroundLightness);
-        var core=mixColor([246,250,255],[88,104,126],backgroundLightness);
-        strokePath3D(points,rgb(halo),opacity*.09,17);
-        strokePath3D(points,rgb(halo),opacity*.24,7);
-        strokePath3D(points,rgb(core),opacity*.96,1.65);
-        strokePath3D(points,rgb(core),opacity*.88,.55);
+        if(opacity<.012)return;
+        var halo=mixColor([82,139,255],[58,104,203],backgroundLightness);
+        var plasma=mixColor([151,190,255],[90,133,218],backgroundLightness);
+        var core=mixColor([255,255,255],[207,225,255],backgroundLightness);
+        ctx.save();ctx.globalCompositeOperation="lighter";
+        strokePath3D(points,rgb(halo),opacity*.12,30);
+        strokePath3D(points,rgb(halo),opacity*.2,15);
+        strokePath3D(points,rgb(plasma),opacity*.48,5.5);
+        strokePath3D(points,rgb(core),opacity*.96,1.8);
+        strokePath3D(points,rgb(core),opacity*.82,.65);
+        ctx.restore();
       }
       function drawElectricity(ribbons,time){
         if(reduceMotion)return;
-        // Travelling packets have smooth envelopes: no random frame-by-frame blinking.
+        // Several overlapping plasma filaments keep the conductor continuously charged.
         ribbons.forEach(function(line,lane){
-          for(var packet=0;packet<2;packet++){
-            var seed=lane*2.17+packet*3.71,phase=(time*(.17+lane*.009)+packet*.5+lane*.24)%1;
-            var opacity=Math.pow(Math.sin(phase*Math.PI),2)*(.84+.16*Math.sin(time*4.2+seed));
-            var start=(.04+.74*phase)*(line.length-1),span=(.09+.025*Math.sin(seed))*(line.length-1),points=[];
-            for(var j=0;j<=24;j++){
-              var t=j/24,index=start+span*t,p=ribbonPoint(line,index),a=ribbonPoint(line,index-1),b=ribbonPoint(line,index+1);
+          var count=lane===1?4:3;
+          for(var packet=0;packet<count;packet++){
+            var seed=lane*7.31+packet*4.17;
+            var phase=(time*(.095+packet*.007)+packet/count+lane*.173)%1;
+            var opacity=.48+.28*(.5+.5*Math.sin(time*3.1+seed));
+            var start=phase*(line.length-1),span=(.24+.045*Math.sin(seed))*(line.length-1),points=[];
+            for(var j=0;j<=54;j++){
+              var t=j/54,index=start+span*t,p=ribbonPoint(line,index),a=ribbonPoint(line,index-1),b=ribbonPoint(line,index+1);
               var length=Math.hypot(b[0]-a[0],b[2]-a[2])||1,nx=-(b[2]-a[2])/length,nz=(b[0]-a[0])/length;
-              var envelope=Math.sin(t*Math.PI);
-              var jagged=.55*Math.sin(t*71+seed+time*2.3)+.28*Math.sin(t*139-seed-time*1.8);
-              var offset=envelope*(.2*Math.sin(time*1.4+seed)+.25*jagged);
+              var envelope=.38+.62*Math.pow(Math.sin(t*Math.PI),.45);
+              var jagged=.44*Math.sin(t*53+seed+time*2.1)+.25*Math.sin(t*117-seed-time*1.55)+.12*Math.sin(t*223+seed*.7+time*2.8);
+              var offset=envelope*(.16*Math.sin(time*1.25+seed)+.2*jagged);
               p[0]+=nx*offset;p[2]+=nz*offset;
-              p[1]+=envelope*(.11+.16*Math.sin(t*89+seed+time*1.7));points.push(p);
+              p[1]+=envelope*(.1*Math.sin(t*47+seed+time*1.4)+.045*Math.sin(t*113-seed-time*1.8));points.push(p);
             }
-            dischargeStroke(points,opacity);
-            // A finer fork slips away from the main packet, then rejoins its rail.
-            var fork=points.slice(8,18).map((p,j)=>[p[0],p[1]+Math.sin(j/9*Math.PI)*.2,p[2]]);
-            dischargeStroke(fork,opacity*.32);
+            dischargeStroke(points,opacity*(packet===0?.92:.58));
+            // Fine, branching leaders flicker away from the bright central plasma.
+            var branchCount=packet===0?9:5;
+            for(var branch=0;branch<branchCount;branch++){
+              var anchor=5+((branch*7+packet*11+lane*3)%43),source=points[anchor],direction=(branch%2?1:-1),fork=[];
+              var branchLength=5+(branch*3+packet)%8;
+              for(var q=0;q<=branchLength;q++){
+                var u=q/branchLength,base=points[Math.min(53,anchor+Math.floor(u*5))];
+                var flicker=Math.sin(u*8.4+seed+time*3.4+branch)*.07;
+                fork.push([base[0]+nx*direction*(u*u*(.12+(branch%4)*.055)+flicker),base[1]+u*(.08+(branch%3)*.045)+.035*Math.sin(u*12+seed+time*2.2),base[2]+nz*direction*(u*u*(.12+(branch%4)*.055)+flicker)]);
+              }
+              dischargeStroke(fork,opacity*(.24+.26*(.5+.5*Math.sin(time*5.3+seed+branch*2.1))));
+            }
           }
         });
-        // Short bridges between neighbouring rails complete the electrical field.
+        // Brief cross-arcs jump between neighbouring charged rails.
         for(var lane=0;lane<2;lane++){
-          var phase=(time*.21+lane*.46+.2)%1,opacity=Math.pow(Math.sin(phase*Math.PI),4)*.66;
+          var phase=(time*.14+lane*.46+.2)%1,opacity=Math.pow(Math.sin(phase*Math.PI),2)*.5;
           var index=(.2+.6*phase)*(ribbons[lane].length-1),a=ribbonPoint(ribbons[lane],index),b=ribbonPoint(ribbons[lane+1],index+3),points=[];
-          for(var j=0;j<=18;j++){
-            var t=j/18,envelope=Math.sin(t*Math.PI);
-            points.push([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t+envelope*(.27+.09*Math.sin(t*81+time*2+lane)),a[2]+(b[2]-a[2])*t]);
+          for(var j=0;j<=28;j++){
+            var t=j/28,envelope=Math.sin(t*Math.PI);
+            var jitter=.045*Math.sin(t*49+time*3.1+lane)+.025*Math.sin(t*93-time*2.2);
+            points.push([a[0]+(b[0]-a[0])*t+jitter,a[1]+(b[1]-a[1])*t+envelope*(.17+.09*Math.sin(t*41+time*2+lane)),a[2]+(b[2]-a[2])*t+jitter]);
           }
           dischargeStroke(points,opacity);
         }
