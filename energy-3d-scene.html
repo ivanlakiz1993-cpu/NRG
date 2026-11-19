@@ -831,6 +831,30 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         index=Math.max(0,Math.min(line.length-1,index));var n=Math.floor(index),t=index-n,a=line[n],b=line[Math.min(n+1,line.length-1)];
         return a.map((v,j)=>v+(b[j]-v)*t);
       }
+      function wireStrand(line,lane,strand){
+        var points=[],phase=strand*Math.PI*2/3+lane*.71;
+        for(var i=0;i<line.length;i++){
+          var p=line[i],a=line[Math.max(0,i-1)],b=line[Math.min(line.length-1,i+1)];
+          var length=Math.hypot(b[0]-a[0],b[2]-a[2])||1,nx=-(b[2]-a[2])/length,nz=(b[0]-a[0])/length;
+          var angle=i*.19+phase,side=Math.cos(angle)*.035,up=Math.sin(angle)*.035;
+          points.push([p[0]+nx*side,p[1]+up,p[2]+nz*side]);
+        }
+        return points;
+      }
+      function drawConductors(ribbons){
+        var body=mixColor([111,126,148],[96,108,126],backgroundLightness);
+        var bright=mixColor([190,207,231],[126,140,160],backgroundLightness);
+        var dark=mixColor([61,75,97],[111,122,139],backgroundLightness);
+        ribbons.forEach(function(line,lane){
+          strokePath3D(line,'#050a12',.8,4.2);
+          strokePath3D(line,rgb(body),.9,2.35);
+          for(var strand=0;strand<3;strand++){
+            var strandLine=wireStrand(line,lane,strand),isBright=(strand+lane)%3===0;
+            strokePath3D(strandLine,rgb(isBright?bright:dark),isBright?.52:.46,isBright?.62:.5);
+          }
+          strokePath3D(line,rgb(bright),.34,.42);
+        });
+      }
       function dischargeStroke(points,opacity){
         if(opacity<.012)return;
         var halo=mixColor([82,139,255],[58,104,203],backgroundLightness);
@@ -849,9 +873,11 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         // Several overlapping plasma filaments keep the conductor continuously charged.
         ribbons.forEach(function(line,lane){
           var count=lane===1?4:3;
+          var speeds=[.108,-.084,.076],offsets=[.11,.56,.82];
           for(var packet=0;packet<count;packet++){
             var seed=lane*7.31+packet*4.17;
-            var phase=(time*(.095+packet*.007)+packet/count+lane*.173)%1;
+            var phase=(time*(speeds[lane]+(packet%2)*.009)+packet/count+offsets[lane])%1;
+            phase=(phase+1)%1;
             var opacity=(.48+.28*(.5+.5*Math.sin(time*3.1+seed)))*.84;
             var start=phase*(line.length-1),span=(.24+.045*Math.sin(seed))*(line.length-1),points=[];
             for(var j=0;j<=54;j++){
@@ -895,12 +921,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         const i=scrollProgress*(route.length-1),head=at(i);
         camera(i);drawBackground();skyContext.drawImage(canvas,0,0);drawStreetscape(head);
         var ribbons=lanes.map(lane=>buildRibbon(i,lane));
-        var grey=mixColor([158,163,171],[93,100,111],backgroundLightness);
-        ribbons.forEach(function(line){
-          // Neutral conductors remain visible while light travels around them.
-          strokePath3D(line,rgb(contourHalo),.16,2.8);
-          strokePath3D(line,rgb(grey),.82,1.15);
-        });
+        drawConductors(ribbons);
         drawElectricity(ribbons,performance.now()/1000);
       }
       function render(time) { draw(time); }
