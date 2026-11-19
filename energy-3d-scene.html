@@ -657,12 +657,13 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             if(pass===0){ctx.save();ctx.globalAlpha=smoothstep((grow-.35)/.4);maskArchitecture(points);ctx.restore();
             fillPolygon3D(points,rgb([65,65,65],face.normal[1]>0?.025:.04),null,smoothstep((grow-.55)/.4)*leave);
             face.windows.forEach(function(pane){
-              var amount=smoothstep((grow-.5-pane.points[0][1]/roofHeight*.18-(pane.col%4)*.012)/.25);
-              var light=building.final?smoothstep((head[0]-71-.2*pane.row-.1*pane.col)/6):smoothstep((building.z-head[2]-.07*pane.row-.04*pane.col)/1.4);
+              var amount=smoothstep((grow-.5-pane.points[0][1]/roofHeight*.18)/.25);
+              // Light a complete window row together so two mullioned halves never disagree.
+              var light=building.final?smoothstep((head[0]-71)/4):smoothstep((building.z-head[2]-.07*pane.row)/1.2);
               if(light>0&&amount>.95&&windowVisible(pane.points)){
                 // Interior lamps keep a soft warm-white tone, independent of contour polarity.
                 var lamp=mixColor([255,218,157],[239,185,112],backgroundLightness);
-                var roomBrightness=.64+.18*(.5+.5*Math.sin(building.seed+pane.row*1.7+pane.col*2.3));
+                var roomBrightness=.76;
                 fillPolygon3D(pane.points,rgb(lamp,light*roomBrightness),null,smoothstep((amount-.95)/.05)*leave);
               }
             });return;}
@@ -702,7 +703,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             face.windows.forEach(function(pane){
               var points=pane.points;
               var floor=points[0][1]/roofHeight;
-              var amount=smoothstep((grow-.5-floor*.18-(pane.col%4)*.012)/.25);
+              var amount=smoothstep((grow-.5-floor*.18)/.25);
               if(amount<=0)return;
               var light=smoothstep((building.z-head[2]-.07*pane.row-.04*pane.col)/1.4);
               var path=partialPath3D(points.concat([points[0]]),amount);
@@ -780,21 +781,32 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             var points=[];for(var k=0;k<=48;k++){var angle=k/48*Math.PI;points.push([-3.5-24.5*Math.cos(angle),20+9*Math.sin(angle),z]);}
             line(points,.55,.85);
           }
-          // Interior roof trusses, lighting rails, cable trays and warm ceiling fixtures.
+          // Arched transverse trusses follow the vaulted shell instead of forming pointed gables.
+          function roofHeightAt(x){return 20+9*Math.sqrt(Math.max(0,1-Math.pow((x+3.5)/24.5,2)));}
           for(var bay=-10;bay>=-90;bay-=10){
-            line([[-25,24,bay],[0,27.5,bay],[25,24,bay]],.48,.58);
-            line([[-25,23.5,bay],[25,23.5,bay]],.42,.5);
+            var arch=[];
+            for(var archX=-25;archX<=25;archX+=2.5)arch.push([archX,roofHeightAt(archX)-.55,bay]);
+            line(arch,.48,.58);
+            line([[-25,20.9,bay],[25,20.9,bay]],.42,.5);
+          }
+          // Continuous curved purlins make the roof read as one coherent hall ceiling.
+          for(var purlinX of [-20,-14,-8,-2,4,10,16,20]){
+            var purlinY=roofHeightAt(purlinX)-.25;
+            line([[purlinX,purlinY,-5],[purlinX,purlinY,-95]],.38,.56);
           }
           for(var trayX of [-12,12]){
-            line([[trayX,25,-5],[trayX,25,-95]],.38,.6);
-            line([[trayX-.25,24.7,-5],[trayX-.25,24.7,-95]],.35,.48);
+            var trayY=roofHeightAt(trayX)-1.15;
+            line([[trayX,trayY,-5],[trayX,trayY,-95]],.38,.6);
+            line([[trayX-.25,trayY-.3,-5],[trayX-.25,trayY-.3,-95]],.35,.48);
           }
           building.interiorLamps=[];
           for(var lampIndex=0;lampIndex<9;lampIndex++){
             var lampZ=-9-lampIndex*10,lampX=lampIndex%2?2.4:-2.4;
-            line([[lampX-1.15,25.1,lampZ],[lampX+1.15,25.1,lampZ]],.62,.85);
-            line([[lampX-1.15,25.1,lampZ],[lampX-1.15,24.8,lampZ],[lampX+1.15,24.8,lampZ],[lampX+1.15,25.1,lampZ]],.55,.78);
-            building.interiorLamps.push([84-lampZ,24.8,-185+lampX]);
+            var fixtureY=roofHeightAt(lampX)-2.2;
+            for(var suspensionZ of [lampZ-1.7,lampZ+1.7])line([[lampX,roofHeightAt(lampX)-.7,suspensionZ],[lampX,fixtureY+.25,suspensionZ]],.54,.62);
+            line([[lampX-.48,fixtureY,lampZ-2.8],[lampX+.48,fixtureY,lampZ-2.8],[lampX+.48,fixtureY,lampZ+2.8],[lampX-.48,fixtureY,lampZ+2.8],[lampX-.48,fixtureY,lampZ-2.8]],.62,.9);
+            line([[lampX-.38,fixtureY-.08,lampZ-2.45],[lampX+.38,fixtureY-.08,lampZ-2.45],[lampX+.38,fixtureY-.08,lampZ+2.45],[lampX-.38,fixtureY-.08,lampZ+2.45],[lampX-.38,fixtureY-.08,lampZ-2.45]],.72,.82);
+            building.interiorLamps.push([84-lampZ,fixtureY-.08,-185+lampX]);
           }
           function frameBox(x0,x1,y0,y1,z0,z1,stage,weight){
             var points=[[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],[x0,y0,z0],[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1],[x0,y0,z1]];
@@ -803,6 +815,19 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             line([[x1,y1,z0],[x1,y1,z1]],stage,weight||.62);
             line([[x0,y1,z0],[x0,y1,z1]],stage,weight||.62);
           }
+          function floorZone(left,right,front,back,stage){
+            line([[left,.08,front],[right,.08,front],[right,.08,back],[left,.08,back],[left,.08,front]],stage,.48,.62);
+            for(var stripe=left+.35;stripe<right-.15;stripe+=.8)line([[stripe,.09,front-.12],[Math.min(right-.1,stripe+.42),.09,front-.72]],stage,.42,.48);
+          }
+          // Two marked pedestrian edges keep the cable route visibly clear through the shop.
+          for(var aisleEdge of [-5.6,5.6]){
+            line([[aisleEdge,.075,-6],[aisleEdge,.075,-95]],.62,.55);
+            for(var aisleMark=-10;aisleMark>=-92;aisleMark-=6)line([[aisleEdge-.22,.08,aisleMark],[aisleEdge+.22,.08,aisleMark]],.66,.44);
+          }
+          floorZone(-18,-5.8,-10,-27,.82);
+          floorZone(7,22,-31,-48,.86);
+          floorZone(-18,-5.8,-47,-64,.89);
+          floorZone(7.4,18.4,-50,-72,.9);
           // Long, loaded industrial rack runs stay against both walls, away from the cable aisle.
           for(var rackSide of [-1,1]){
             var rackInner=rackSide<0?-23:18,rackOuter=rackSide<0?-18:23;
@@ -819,10 +844,13 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           // CNC machining center: enclosed work area, tool head, table and operator panel.
           frameBox(-16,-8,.2,5.4,-13,-24,.83,.9);
           frameBox(-15.2,-8.8,1,4.8,-13.15,-13.45,.9,.6);
+          line([[-15.1,3.15,-13.2],[-8.9,3.15,-13.2],[-8.9,4.55,-13.2],[-15.1,4.55,-13.2],[-15.1,3.15,-13.2]],.92,.68);
+          line([[-12,3.2,-13.22],[-12,4.5,-13.22]],.93,.38);
           line([[-15.4,1.5,-24.1],[-8.6,1.5,-24.1],[-8.6,2,-23.3],[-15.4,2,-23.3],[-15.4,1.5,-24.1]],.92,.8);
           line([[-12,4.75,-14],[-12,3.6,-14],[-11.5,3.6,-14]],.95,.78);
           frameBox(-7.2,-6.4,1.1,3.7,-15,-17,.96,.75);
           line([[-6.4,3.15,-15.08],[-6.4,2.3,-15.08]],.98,.7);
+          for(var controlButton=0;controlButton<4;controlButton++)ring(-6.35,2.95-controlButton*.32,-16,.075,.99);
           // Hydraulic press with a wide bed, twin columns, ram and safety cage.
           frameBox(8,18,.15,1.7,-34,-46,.86,.85);
           for(var pressX of [9.2,16.8])frameBox(pressX-.38,pressX+.38,1.7,9.8,-35,-36,.88,.82);
@@ -832,6 +860,10 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           line([[8.2,.35,-34.5],[18,.35,-34.5]],.96,.65);
           frameBox(18.7,20.8,2,5.7,-36,-38,.98,.62);
           line([[19,5.2,-36.05],[20.4,5.2,-36.05]],.99,.55);
+          for(var guardZ of [-34.5,-45.5]){
+            line([[7.6,.1,guardZ],[7.6,4.8,guardZ],[8.3,4.8,guardZ]],.92,.54);
+            line([[18.4,.1,guardZ],[18.4,4.8,guardZ],[17.7,4.8,guardZ]],.92,.54);
+          }
           // Roller conveyor, motor housings and guarded transfer section, outside the cable lane.
           frameBox(8.2,17.6,.55,1.35,-52,-70,.88,.64);
           for(var rollerZ=-53;rollerZ>=-69;rollerZ-=1.25){
@@ -860,7 +892,13 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             for(var button=0;button<3;button++)ring(cabX+.3+button*.17,2.9,cabZ-.04,.055,.99);
           }
           frameBox(-17,-9,.2,2.6,-49,-61,.89,.64);
-          for(var latheZ of [-51,-55,-59])ring(-13,1.35,latheZ,.62,.93);
+          function spindleRing(x,y,z,r,stage){var circle=[];for(var k=0;k<=32;k++){var angle=k/32*Math.PI*2;circle.push([x+Math.cos(angle)*r,y+Math.sin(angle)*r,z]);}line(circle,stage,.7);}
+          for(var latheZ of [-50.5,-59.5])spindleRing(-13,1.4,latheZ,.72,.93);
+          for(var latheAngle=0;latheAngle<8;latheAngle++){
+            var angle=latheAngle/8*Math.PI*2;
+            line([[-13+Math.cos(angle)*.72,1.4+Math.sin(angle)*.72,-50.5],[-13+Math.cos(angle)*.72,1.4+Math.sin(angle)*.72,-59.5]],.93,.52);
+          }
+          spindleRing(-13,1.4,-50.35,.88,.94);
           line([[-16,2.2,-52],[-10,2.2,-52],[-10,2.2,-58],[-16,2.2,-58]],.94,.58);
           frameBox(-16,-9,.2,2.1,-77,-86,.93,.62);
           frameBox(-15.5,-9.5,2.1,3.2,-79,-84,.95,.58);
@@ -959,14 +997,14 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           building.interiorLamps.forEach(function(lamp){
             var p=projectInto(lamp[0],lamp[1],lamp[2],{});
             if(!p.visible||!visibleAt(p.x,p.y,1/p.depth))return;
-            var radius=Math.min(48,Math.max(5,focal/p.depth*1.05));
+            var radius=Math.min(76,Math.max(8,focal/p.depth*2.2));
             var glow=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,radius);
-            glow.addColorStop(0,"rgba(255,216,158,"+(.18*lampPower)+")");
-            glow.addColorStop(.38,"rgba(255,196,126,"+(.075*lampPower)+")");
+            glow.addColorStop(0,"rgba(255,221,171,"+(.28*lampPower)+")");
+            glow.addColorStop(.38,"rgba(255,198,129,"+(.13*lampPower)+")");
             glow.addColorStop(1,"rgba(255,186,112,0)");
             ctx.fillStyle=glow;ctx.fillRect(p.x-radius,p.y-radius,radius*2,radius*2);
-            ctx.fillStyle="rgba(255,231,194,"+(.7*lampPower)+")";
-            ctx.fillRect(p.x-radius*.2,p.y-1,Math.max(2,radius*.4),2);
+            ctx.fillStyle="rgba(255,235,204,"+(.88*lampPower)+")";
+            ctx.fillRect(p.x-radius*.3,p.y-1.6,Math.max(3,radius*.6),3.2);
           });
           ctx.restore();
         }
