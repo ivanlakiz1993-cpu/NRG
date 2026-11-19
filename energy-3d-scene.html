@@ -435,7 +435,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               var portalHalf=8.2,portalHeight=6.6,leftX=Math.min(bottom[i][0],bottom[j][0]),rightX=Math.max(bottom[i][0],bottom[j][0]),wallZ=bottom[i][2];
               var sections=[[leftX,-portalHalf,y0,Math.max(...tops)],[portalHalf,rightX,y0,Math.max(...tops)],[-portalHalf,portalHalf,portalHeight,Math.max(...tops)]];
               sections.forEach(function(section){
-                var sectionWindows=windows.filter(function(pane){var paneX=pane.points.reduce((sum,p)=>sum+p[0],0)/pane.points.length,paneY=pane.points.reduce((sum,p)=>sum+p[1],0)/pane.points.length;return paneX>=section[0]&&paneX<=section[1]&&paneY>=section[2]&&paneY<=section[3];});
+                var sectionWindows=windows.filter(function(pane){var paneX=pane.points.map(p=>p[0]),paneY=pane.points.map(p=>p[1]);return Math.max(...paneX)>section[0]&&Math.min(...paneX)<section[1]&&Math.max(...paneY)>section[2]&&Math.min(...paneY)<section[3];});
                 face([[section[0],section[2],wallZ],[section[1],section[2],wallZ],[section[1],section[3],wallZ],[section[0],section[3],wallZ]],sectionWindows);
                 sideFaces.push(faces[faces.length-1]);
               });
@@ -664,7 +664,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
                 // Interior lamps keep a soft warm-white tone, independent of contour polarity.
                 var lamp=mixColor([255,218,157],[239,185,112],backgroundLightness);
                 var roomBrightness=.76;
-                var paneFill={points:pane.points,color:rgb(lamp,light*roomBrightness),alpha:smoothstep((amount-.95)/.05)*leave};
+                var paneFill={points:pane.points,face:face.points,color:rgb(lamp,light*roomBrightness),alpha:smoothstep((amount-.95)/.05)*leave};
                 if(building.final)factoryWindows.push(paneFill);
                 else if(windowVisible(pane.points))fillPolygon3D(paneFill.points,paneFill.color,null,paneFill.alpha);
               }
@@ -720,12 +720,19 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             });
             ctx.restore();
         });
-        // Paint each factory pane once, over all facade sections, so section seams cannot hide half a window.
+        // Clip factory glazing to its actual facade section; curved corners and roof edges cannot leak light.
         factoryWindows.forEach(function(pane){
           var centre=pane.points.reduce((sum,p)=>sum.map((v,i)=>v+p[i]/pane.points.length),[0,0,0]);
           var projected=projectInto(...centre,{});
-          if(projected.visible&&visibleAt(projected.x,projected.y,1/projected.depth))
+          if(projected.visible&&visibleAt(projected.x,projected.y,1/projected.depth)){
+            var boundary=clipPolygon(pane.face).map(p=>projectInto(...p,{}));
+            if(boundary.length<3||boundary.some(p=>!p.visible))return;
+            ctx.save();ctx.beginPath();ctx.moveTo(boundary[0].x,boundary[0].y);
+            for(var edge=1;edge<boundary.length;edge++)ctx.lineTo(boundary[edge].x,boundary[edge].y);
+            ctx.closePath();ctx.clip();
             fillPolygon3D(pane.points,pane.color,null,pane.alpha);
+            ctx.restore();
+          }
         });
         active.forEach(building=>drawPlotDetails(building,head));
       }
