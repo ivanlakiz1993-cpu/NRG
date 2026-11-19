@@ -633,7 +633,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       }
       function drawStreetscape(head){
         var time=reduceMotion?0:performance.now()*.00035;
-        var queue=[],active=[];
+        var queue=[],active=[],factoryPaneRepairs=[];
         function faceDepth(face){return (face.mid[0]-cameraX)*cameraForward[0]+(face.mid[1]-cameraY)*cameraForward[1]+(face.mid[2]-cameraZ)*cameraForward[2]}
         streetscape.forEach(function(building){
           var ahead=building.routeIndex===undefined?head[2]-building.z:building.routeIndex-currentRouteIndex;
@@ -660,11 +660,14 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               var amount=smoothstep((grow-.5-pane.points[0][1]/roofHeight*.18)/.25);
               // Light a complete window row together so two mullioned halves never disagree.
               var light=building.final?smoothstep((head[0]-71)/4):smoothstep((building.z-head[2]-.07*pane.row)/1.2);
-              if(light>0&&amount>.95&&windowVisible(pane.points)){
+              var repairFactoryPane=building.final&&Math.abs(face.mid[0]-84)<.08&&pane.col===1&&(pane.row===2||pane.row===3);
+              if(light>0&&amount>.95&&(repairFactoryPane||windowVisible(pane.points))){
                 // Interior lamps keep a soft warm-white tone, independent of contour polarity.
                 var lamp=mixColor([255,218,157],[239,185,112],backgroundLightness);
                 var roomBrightness=.76;
-                fillPolygon3D(pane.points,rgb(lamp,light*roomBrightness),null,smoothstep((amount-.95)/.05)*leave);
+                var paneFill={points:pane.points,color:rgb(lamp,light*roomBrightness),alpha:smoothstep((amount-.95)/.05)*leave};
+                fillPolygon3D(paneFill.points,paneFill.color,null,paneFill.alpha);
+                if(repairFactoryPane)factoryPaneRepairs.push(paneFill);
               }
             });return;}
             // A travelling, continuous light band sweeps across the complete facade.
@@ -717,6 +720,10 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               }
             });
             ctx.restore();
+        });
+        factoryPaneRepairs.forEach(function(pane){
+          fillPolygon3D(pane.points,pane.color,null,pane.alpha);
+          strokePath3D(pane.points.concat([pane.points[0]]),rgb(contourBase),.86,.8);
         });
         active.forEach(building=>drawPlotDetails(building,head));
       }
