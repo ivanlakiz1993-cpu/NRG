@@ -97,9 +97,10 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         [4,2,-40],[9,1.35,-46],stops[1].socket,[8,1.35,-51],
         [3,1.35,-53],[0,1.65,-55],[-2,2.1,-61],[0,2.8,-68],[-9,1.5,-76],stops[2].socket,[-12,1.35,-84],[-8,1.7,-89],[0,2.4,-99],[8,1.35,-110],stops[3].socket,[7,1.35,-118],[0,2,-126],[0,3,-143],
         [0,3,-160],[3,3,-174],[14,3,-183],[33,3,-185],[56,3,-185],[76,3,-185],[80,3,-185],
-        [78,3,-191],[73,3,-199],[70,3,-209],[70,3,-222],[70,3,-239],[72,3,-253],
-        [79,3,-265],[89,3,-273],[100,3,-280],[100,3,-296],[100,3,-314],
-        [104,3,-331],[112,3,-345]
+        [86,3,-185.6],[91.3,3,-189.7],[94.8,3,-195],[96,3,-201],
+        [96,3,-216],[96,3,-232],[96,3,-246],[97,3,-255],[100,3,-263],
+        [106,3,-270],[115,3,-276],[122,3,-282],[122,3,-298],[122,3,-316],
+        [126,3,-334],[134,3,-350]
       ],36);      function at(i){i=Math.max(0,Math.min(route.length-1,i));var k=Math.floor(i),a=route[k],b=route[Math.min(k+1,route.length-1)];return a.map((v,j)=>v+(b[j]-v)*(i-k))}
       var originalRouteEnd=26*36;
       var routeDistances=[0];
@@ -107,10 +108,13 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var previous=route[distanceIndex-1],current=route[distanceIndex];
         routeDistances.push(routeDistances[distanceIndex-1]+Math.hypot(current[0]-previous[0],current[2]-previous[2]));
       }
-      function pointBehind(index,distance){
+      var cameraTrailDistance=32;
+      function routeDistanceAt(index){
         var segment=Math.floor(index),next=Math.min(route.length-1,segment+1),fraction=index-segment;
-        var along=routeDistances[segment]+(routeDistances[next]-routeDistances[segment])*fraction;
-        var target=Math.max(0,along-distance),low=0,high=routeDistances.length-1;
+        return routeDistances[segment]+(routeDistances[next]-routeDistances[segment])*fraction;
+      }
+      function pointBehind(index,distance){
+        var target=Math.max(0,routeDistanceAt(index)-distance),low=0,high=routeDistances.length-1;
         while(low<high){var middle=(low+high)>>1;if(routeDistances[middle]<target)low=middle+1;else high=middle;}
         if(low===0)return route[0].slice();
         var start=route[low-1],end=route[low],span=routeDistances[low]-routeDistances[low-1];
@@ -124,6 +128,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var turn=smoothstep((i-originalRouteEnd)/90);
         var before=at(i-18),after=at(i+18),heading=unit([after[0]-before[0],0,after[2]-before[2]]);
         var followDistance=32+Math.max(0,72*focal/(width*1.04)-38)*turn;
+        cameraTrailDistance=followDistance;
         var cameraTrackPoint=pointBehind(i,followDistance);
         cameraX+=(cameraTrackPoint[0]-cameraX)*turn;
         cameraZ+=(cameraTrackPoint[2]-cameraZ)*turn;
@@ -574,10 +579,12 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       }
       var finalFactory={x:0,z:0,w:56,depth:20,h:25,side:1,variant:8,seed:42,final:true};
       streetscape.push(finalFactory);
-      var firstPlant={x:20,z:-219,w:54,depth:44,h:39,side:-1,variant:7,seed:61,industrial:true};
-      firstPlant.routeIndex=nearestRouteIndex(70,-220,originalRouteEnd+80);
-      var secondPlant={x:166,z:-280,w:62,depth:48,h:45,side:1,variant:6,seed:74,industrial:true};
-      secondPlant.routeIndex=nearestRouteIndex(100,-280,firstPlant.routeIndex+100);
+      var firstPlant={x:43,z:-201,w:54,depth:44,h:39,side:-1,variant:7,seed:61,industrial:true};
+      firstPlant.routeIndex=nearestRouteIndex(96,-201,originalRouteEnd+80);
+      firstPlant.routeEndIndex=nearestRouteIndex(96,-245,firstPlant.routeIndex+1);
+      var secondPlant={x:158,z:-280,w:62,depth:48,h:45,side:1,variant:6,seed:74,industrial:true};
+      secondPlant.routeIndex=nearestRouteIndex(122,-280,firstPlant.routeEndIndex+1);
+      secondPlant.routeEndIndex=nearestRouteIndex(122,-328,secondPlant.routeIndex+1);
       streetscape.push(firstPlant,secondPlant);
       streetscape.forEach(function(b){
         b.faces=makeArchitecture(b);
@@ -601,6 +608,14 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var rise=smoothstep((38-distance-stagger)/17);
         return opening*rise;
       }
+      function buildingLeave(building,ahead){
+        if(building.final)return 1;
+        if(building.routeEndIndex!==undefined){
+          var passed=routeDistanceAt(currentRouteIndex)-routeDistances[building.routeEndIndex]-cameraTrailDistance;
+          return 1-smoothstep((passed-2)/12);
+        }
+        return 1-smoothstep((-ahead-2)/19);
+      }
       function partialPath3D(points,amount){
         if(amount<=0||points.length<2)return [];
         if(amount>=1)return points;
@@ -622,7 +637,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         function faceDepth(face){return (face.mid[0]-cameraX)*cameraForward[0]+(face.mid[1]-cameraY)*cameraForward[1]+(face.mid[2]-cameraZ)*cameraForward[2]}
         streetscape.forEach(function(building){
           var ahead=building.routeIndex===undefined?head[2]-building.z:building.routeIndex-currentRouteIndex;
-          var grow=drawingProgress(building,head),leave=building.final?1:1-smoothstep((-ahead-2)/19);
+          var grow=drawingProgress(building,head),leave=buildingLeave(building,ahead);
           if(grow<=0||leave<=0||(!building.final&&building.routeIndex===undefined&&building.z>cameraZ-4))return;
           active.push(building);
           var roofHeight=Math.max(...building.faces.flatMap(f=>f.points.map(p=>p[1])));
@@ -707,8 +722,9 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       function drawPlotDetails(building,head){
         if(building.final){drawFactoryDetails(building,head);return;}
         var grow=drawingProgress(building,head),ahead=building.routeIndex===undefined?head[2]-building.z:building.routeIndex-currentRouteIndex;
-        if(grow<=0||ahead>45||ahead< -18)return;
-        var leave=1-smoothstep((-ahead-2)/19),x=building.x,z=building.z,w=building.w,d=building.depth;
+        var detailTail=building.routeEndIndex===undefined?ahead:routeDistances[building.routeEndIndex]+cameraTrailDistance-routeDistanceAt(currentRouteIndex);
+        if(grow<=0||ahead>45||detailTail<(building.routeEndIndex===undefined?-18:-10))return;
+        var leave=buildingLeave(building,ahead),x=building.x,z=building.z,w=building.w,d=building.depth;
         var bounds=building.bounds,front=bounds.maxZ,paths=[];
         function detail(points,stage,weight,alpha){paths.push({points:points,stage:stage,weight:weight||.65,alpha:alpha===undefined?1:alpha})}
         // A fine fence along the inward plot boundary, with vertical posts and two rails.
