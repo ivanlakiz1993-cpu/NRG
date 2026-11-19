@@ -62,6 +62,7 @@
       var cameraPosition = [0,0,0];
       var cameraTarget = [0,0,0];
       var previousTarget = [0,0,0];
+      var openingCamera = null;
       var lastFrame = 0;
       var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -820,14 +821,26 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var p0=curve[Math.max(0,index-1)],p1=curve[index],p2=curve[index+1],p3=curve[Math.min(curve.length-1,index+2)];
         return [0,1].map(function(axis){return .5*(2*p1[axis]+(-p0[axis]+p2[axis])*u+(2*p0[axis]-5*p1[axis]+4*p2[axis]-p3[axis])*u*u+(-p0[axis]+3*p1[axis]-3*p2[axis]+p3[axis])*u*u*u)});
       }
+      function openingWorldPoint(p,target){
+        if(!openingCamera)return p;
+        var dx=p[0]-openingCamera.x,dy=p[1]-openingCamera.y,dz=p[2]-openingCamera.z;
+        var vx=dx*openingCamera.right[0]+dy*openingCamera.right[1]+dz*openingCamera.right[2];
+        var vy=dx*openingCamera.up[0]+dy*openingCamera.up[1]+dz*openingCamera.up[2];
+        var depth=dx*openingCamera.forward[0]+dy*openingCamera.forward[1]+dz*openingCamera.forward[2];
+        if(depth<=1.61)return p;
+        var targetX=(target[0]*width-width*.5)*depth/focal;
+        var targetY=(height*.51-target[1]*height)*depth/focal;
+        var moveX=targetX-vx,moveY=targetY-vy,r=openingCamera.right,u=openingCamera.up;
+        return [p[0]+r[0]*moveX+u[0]*moveY,p[1]+r[1]*moveX+u[1]*moveY,p[2]+r[2]*moveX+u[2]*moveY];
+      }
       var openingCurves=[
-        [[.306,.31],[.34,.47],[.42,.65],[.48,.77],[.474,.88]],
-        [[.588,.30],[.59,.43],[.61,.55],[.59,.7],[.557,.8]],
-        [[.759,.31],[.7,.46],[.64,.59],[.57,.7],[.557,.8]]
+        [[.468,.40],[.441,.55],[.456,.68],[.50,.78],[.519,.88]],
+        [[.496,.35],[.482,.48],[.451,.65],[.512,.76],[.484,.88]],
+        [[.506,.35],[.548,.48],[.563,.62],[.54,.74],[.489,.87]]
       ];
       function buildRibbon(i,lane){
         var line=[],start=i-88,end=i+4;
-        var initialBlend=1-smoothstep(i/130),wireIndex=lane+1;
+        var wireIndex=lane+1,openingBlend=1;
         for(var k=start;k<end;k+=.65){
           var v=at(k),spread=Math.min(1,...stops.map(stop=>Math.hypot(v[0]-stop.socket[0],v[2]-stop.front)/2.8));
           if(k<0){v[1]+=(-k)*.035;v[2]+=(-k)*.12;}
@@ -838,18 +851,10 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           var frequency=[.025,.018,.028][wireIndex],phase=[.7,2.35,4.65][wireIndex];
           var lateral=base+amplitude*Math.sin(k*frequency+phase)+.12*Math.sin(k*.061+phase*1.7);
           var vertical=lane*.055+.065*Math.cos(k*frequency*.82+phase);
-          var t=(k-start)/(end-start),x=v[0]+nx*lateral*spread,y=v[1]+vertical*spread,z=v[2]+nz*lateral*spread;
-          if(initialBlend>.001){
-            var projected=projectInto(x,y,z,{}),target=openingPoint(openingCurves[wireIndex],t);
-            if(projected.visible){
-              var moveX=(target[0]*width-projected.x)*projected.depth/focal*initialBlend;
-              var moveY=(projected.y-target[1]*height)*projected.depth/focal*initialBlend;
-              x+=cameraRight[0]*moveX+cameraUp[0]*moveY;
-              y+=cameraRight[1]*moveX+cameraUp[1]*moveY;
-              z+=cameraRight[2]*moveX+cameraUp[2]*moveY;
-            }
-          }
-          line.push([x,y,z]);
+          var p=[v[0]+nx*lateral*spread,v[1]+vertical*spread,v[2]+nz*lateral*spread];
+          openingBlend=1-smoothstep((k-4)/112);
+          var target=openingPoint(openingCurves[wireIndex],(k+88)/92),opening=openingWorldPoint(p,target);
+          line.push(p.map(function(value,axis){return value+(opening[axis]-value)*openingBlend}));
         }
         return line;
       }
@@ -946,7 +951,9 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       function draw(){
         strokeCache=new WeakMap();
         const i=scrollProgress*(route.length-1),head=at(i);
-        camera(i);drawBackground();skyContext.drawImage(canvas,0,0);drawStreetscape(head);
+        camera(i);
+        if(!openingCamera){camera(0);openingCamera={x:cameraX,y:cameraY,z:cameraZ,forward:cameraForward.slice(),right:cameraRight.slice(),up:cameraUp.slice()};camera(i);}
+        drawBackground();skyContext.drawImage(canvas,0,0);drawStreetscape(head);
         var ribbons=lanes.map(lane=>buildRibbon(i,lane));
         drawConductors(ribbons);
         drawElectricity(ribbons,performance.now()/1000);
