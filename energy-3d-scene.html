@@ -907,9 +907,9 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       }
       function dischargeStroke(points,opacity){
         if(opacity<.012)return;
-        var halo=mixColor([174,174,174],[110,110,110],backgroundLightness);
-        var plasma=mixColor([220,220,220],[145,145,145],backgroundLightness);
-        var core=mixColor([255,255,255],[207,207,207],backgroundLightness);
+        var halo=mixColor([82,139,255],[58,104,203],backgroundLightness);
+        var plasma=mixColor([151,190,255],[90,133,218],backgroundLightness);
+        var core=mixColor([255,255,255],[207,225,255],backgroundLightness);
         ctx.save();ctx.globalCompositeOperation="lighter";
         strokePath3D(points,rgb(halo),opacity*.095,27);
         strokePath3D(points,rgb(halo),opacity*.16,13.5);
