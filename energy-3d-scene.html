@@ -102,6 +102,21 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         [104,3,-331],[112,3,-345]
       ],36);      function at(i){i=Math.max(0,Math.min(route.length-1,i));var k=Math.floor(i),a=route[k],b=route[Math.min(k+1,route.length-1)];return a.map((v,j)=>v+(b[j]-v)*(i-k))}
       var originalRouteEnd=26*36;
+      var routeDistances=[0];
+      for(var distanceIndex=1;distanceIndex<route.length;distanceIndex++){
+        var previous=route[distanceIndex-1],current=route[distanceIndex];
+        routeDistances.push(routeDistances[distanceIndex-1]+Math.hypot(current[0]-previous[0],current[2]-previous[2]));
+      }
+      function pointBehind(index,distance){
+        var segment=Math.floor(index),next=Math.min(route.length-1,segment+1),fraction=index-segment;
+        var along=routeDistances[segment]+(routeDistances[next]-routeDistances[segment])*fraction;
+        var target=Math.max(0,along-distance),low=0,high=routeDistances.length-1;
+        while(low<high){var middle=(low+high)>>1;if(routeDistances[middle]<target)low=middle+1;else high=middle;}
+        if(low===0)return route[0].slice();
+        var start=route[low-1],end=route[low],span=routeDistances[low]-routeDistances[low-1];
+        var t=span?(target-routeDistances[low-1])/span:0;
+        return start.map((value,axis)=>value+(end[axis]-value)*t);
+      }
       function camera(i){
         var head=at(i), rear=at(i-38);
         cameraX=head[0]*.88; cameraY=3.7+Math.min(2,head[1]*.1); cameraZ=head[2]+22;
@@ -109,8 +124,9 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var turn=smoothstep((i-originalRouteEnd)/90);
         var before=at(i-18),after=at(i+18),heading=unit([after[0]-before[0],0,after[2]-before[2]]);
         var followDistance=32+Math.max(0,72*focal/(width*1.04)-38)*turn;
-        cameraX+=(head[0]-heading[0]*followDistance-cameraX)*turn;
-        cameraZ+=(head[2]-heading[2]*followDistance-cameraZ)*turn;
+        var cameraTrackPoint=pointBehind(i,followDistance);
+        cameraX+=(cameraTrackPoint[0]-cameraX)*turn;
+        cameraZ+=(cameraTrackPoint[2]-cameraZ)*turn;
         cameraY+=(4.6-cameraY)*turn;
         var targetX=head[0]+heading[0]*5*turn;
         var targetZ=head[2]-3*(1-turn)+heading[2]*5*turn;
