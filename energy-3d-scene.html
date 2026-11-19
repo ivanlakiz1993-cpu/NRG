@@ -1139,12 +1139,13 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var grow=drawingProgress(building,head);if(grow<=0)return;
         building.detailPanels.forEach(function(item){
           var amount=detailAmount(grow,item.stage);
-          if(amount>.01)fillSurface3D(item.points,item.color,amount);
+          // Every solid is pure black; only contour lines, light and electricity carry colour.
+          if(amount>.01)fillSurface3D(item.points,'#000',amount);
         });
         building.interiorWindows.forEach(function(pane){
           var power=factoryPower(pane.points.reduce((sum,p)=>sum+p[0]/4,0),pane.row);
           fillSurface3D(pane.points,'#ffe0a3',power*.56*detailAmount(grow,.72));
-          strokePath3D(pane.points.concat([pane.points[0]]),'#a7b2bf',detailAmount(grow,.72)*.65,.65);
+          strokePath3D(pane.points.concat([pane.points[0]]),rgb(contourBase),detailAmount(grow,.72)*.65,.65);
         });
         building.detailPaths.forEach(function(path){
           var points=partialPath3D(path.points,detailAmount(grow,path.stage));
@@ -1160,7 +1161,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         });
         building.powerBranches.forEach(function(branch){
           var power=factoryPower(branch.entry,0)*detailAmount(grow,.8);
-          strokePath3D(branch.points,'#9dbfe8',(.28+power*.55)*detailAmount(grow,.8),1);
+          strokePath3D(branch.points,rgb(contourBase),(.28+power*.55)*detailAmount(grow,.8),1);
           if(power>0)strokePath3D(branch.indicator,'#ffe0a3',power,2.5);
         });
 
