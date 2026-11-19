@@ -612,8 +612,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               var light=building.final?smoothstep((head[0]-71-.2*pane.row-.1*pane.col)/6):smoothstep((building.z-head[2]-.07*pane.row-.04*pane.col)/1.4);
               if(light>0&&amount>.95&&windowVisible(pane.points)){
                 // Interior lamps keep a soft warm-white tone, independent of contour polarity.
-                var lamp=mixColor([255,240,216],[230,206,169],backgroundLightness);
-                var roomBrightness=.46+.14*(.5+.5*Math.sin(building.seed+pane.row*1.7+pane.col*2.3));
+                var lamp=mixColor([255,218,157],[239,185,112],backgroundLightness);
+                var roomBrightness=.64+.18*(.5+.5*Math.sin(building.seed+pane.row*1.7+pane.col*2.3));
                 fillPolygon3D(pane.points,rgb(lamp,light*roomBrightness),null,smoothstep((amount-.95)/.05)*leave);
               }
             });return;}
