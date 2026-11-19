@@ -660,7 +660,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               var amount=smoothstep((grow-.5-pane.points[0][1]/roofHeight*.18)/.25);
               // Light a complete window row together so two mullioned halves never disagree.
               var light=building.final?smoothstep((head[0]-71)/4):smoothstep((building.z-head[2]-.07*pane.row)/1.2);
-              var repairFactoryPane=building.final&&Math.abs(face.mid[0]-84)<.08&&pane.col===1&&(pane.row===2||pane.row===3);
+              var repairFactoryPane=building.final&&Math.abs(face.mid[0]-84)<.08&&pane.col===6&&(pane.row===2||pane.row===3);
               if(light>0&&amount>.95&&(repairFactoryPane||windowVisible(pane.points))){
                 // Interior lamps keep a soft warm-white tone, independent of contour polarity.
                 var lamp=mixColor([255,218,157],[239,185,112],backgroundLightness);
