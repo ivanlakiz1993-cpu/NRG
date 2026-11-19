@@ -838,20 +838,39 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         [[.496,.35],[.482,.48],[.451,.65],[.512,.76],[.484,.88]],
         [[.506,.35],[.548,.48],[.563,.62],[.54,.74],[.489,.87]]
       ];
+      function ribbonStart(i){
+        if(i<120)return i-88;
+        var minimum=i-380;
+        for(var k=i-88;k>minimum;k-=4){
+          var p=at(k);p[1]=.24;
+          if(k<0)p[2]+=(-k)*.12;
+          if(worldDepth(p)<-18)return k;
+        }
+        return minimum;
+      }
       function buildRibbon(i,lane){
-        var line=[],start=i-88,end=i+4;
+        var line=[],start=ribbonStart(i),end=i+4;
+        line.routeStart=start;line.routeStep=.65;
         var wireIndex=lane+1,openingBlend=1;
         for(var k=start;k<end;k+=.65){
-          var v=at(k),spread=Math.min(1,...stops.map(stop=>Math.hypot(v[0]-stop.socket[0],v[2]-stop.front)/2.8));
-          if(k<0){v[1]+=(-k)*.035;v[2]+=(-k)*.12;}
+          var v=at(k);v[1]=.24;
+          if(k<0)v[2]+=(-k)*.12;
           var turn=smoothstep((k-originalRouteEnd)/90),a=at(k-1),b=at(k+1);
           var dx=b[0]-a[0],dz=b[2]-a[2],length=Math.hypot(dx,dz)||1;
           var nx=1-turn+(-dz/length)*turn,nz=(dx/length)*turn;
           var base=[-1.38,0,1.38][wireIndex],amplitude=[.52,.92,.58][wireIndex];
           var frequency=[.025,.018,.028][wireIndex],phase=[.7,2.35,4.65][wireIndex];
           var lateral=base+amplitude*Math.sin(k*frequency+phase)+.12*Math.sin(k*.061+phase*1.7);
+          var attachment=[0,0,0];
+          stops.forEach(function(stop){
+            var distance=Math.hypot(v[0]-stop.socket[0],v[2]-stop.front);
+            var influence=1-smoothstep((distance-2)/14);
+            var offsets=stop.kind===0?[-.3,-.05,2.9]:[-2.0,-2.1,.1];
+            attachment[wireIndex]+=offsets[wireIndex]*influence;
+          });
+          lateral+=attachment[wireIndex];
           var vertical=lane*.055+.065*Math.cos(k*frequency*.82+phase);
-          var p=[v[0]+nx*lateral*spread,v[1]+vertical*spread,v[2]+nz*lateral*spread];
+          var p=[v[0]+nx*lateral,v[1]+vertical,v[2]+nz*lateral];
           openingBlend=1-smoothstep((k-4)/112);
           var target=openingPoint(openingCurves[wireIndex],(k+88)/92),opening=openingWorldPoint(p,target);
           line.push(p.map(function(value,axis){return value+(opening[axis]-value)*openingBlend}));
