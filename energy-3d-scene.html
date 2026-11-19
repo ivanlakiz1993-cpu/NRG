@@ -891,9 +891,9 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           var turn=smoothstep((k-originalRouteEnd)/90),a=at(k-1),b=at(k+1);
           var dx=b[0]-a[0],dz=b[2]-a[2],length=Math.hypot(dx,dz)||1;
           var nx=1-turn+(-dz/length)*turn,nz=(dx/length)*turn;
-          var base=[-1.38,0,1.38][wireIndex],amplitude=[.52,.92,.58][wireIndex];
-          var frequency=[.025,.018,.028][wireIndex],phase=[.7,2.35,4.65][wireIndex];
-          var lateral=base+amplitude*Math.sin(k*frequency+phase)+.12*Math.sin(k*.061+phase*1.7);
+          var base=[-1.55,0,1.55][wireIndex],amplitude=[.18,.24,.18][wireIndex];
+          var frequency=[.021,.017,.024][wireIndex],phase=[.7,2.35,4.65][wireIndex];
+          var lateral=base+amplitude*Math.sin(k*frequency+phase)+.04*Math.sin(k*.052+phase*1.7);
           var attachment=[0,0,0];
           stops.forEach(function(stop){
             var distance=Math.hypot(v[0]-stop.socket[0],v[2]-stop.front);
