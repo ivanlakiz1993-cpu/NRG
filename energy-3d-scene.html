@@ -817,17 +817,24 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       var lanes=[-1,0,1];
       function buildRibbon(i,lane){
         var line=[],start=i-88,end=i+4;
+        var initialBlend=1-smoothstep(i/130),wireIndex=lane+1;
+        var initialStarts=[-3.1,.15,3.15],initialEnds=[.2,-.45,-.55],initialBow=[.85,1.55,-1.1];
+        var initialRise=[1.15,.38,-1.2];
         for(var k=start;k<end;k+=.65){
           var v=at(k),spread=Math.min(1,...stops.map(stop=>Math.hypot(v[0]-stop.socket[0],v[2]-stop.front)/2.8));
           if(k<0){v[1]+=(-k)*.035;v[2]+=(-k)*.12;}
           var turn=smoothstep((k-originalRouteEnd)/90),a=at(k-1),b=at(k+1);
           var dx=b[0]-a[0],dz=b[2]-a[2],length=Math.hypot(dx,dz)||1;
           var nx=1-turn+(-dz/length)*turn,nz=(dx/length)*turn;
-          var wireIndex=lane+1;
           var base=[-1.38,0,1.38][wireIndex],amplitude=[.52,.92,.58][wireIndex];
           var frequency=[.025,.018,.028][wireIndex],phase=[.7,2.35,4.65][wireIndex];
           var lateral=base+amplitude*Math.sin(k*frequency+phase)+.12*Math.sin(k*.061+phase*1.7);
           var vertical=lane*.055+.065*Math.cos(k*frequency*.82+phase);
+          var t=Math.max(0,Math.min(1,(k-start)/(end-start))),arc=Math.sin(t*Math.PI);
+          var initialLateral=initialStarts[wireIndex]+(initialEnds[wireIndex]-initialStarts[wireIndex])*t+initialBow[wireIndex]*arc;
+          var initialVertical=initialRise[wireIndex]*arc+(wireIndex===1?.62*Math.sin(t*Math.PI*2):0);
+          lateral=lateral*(1-initialBlend)+initialLateral*initialBlend;
+          vertical=vertical*(1-initialBlend)+initialVertical*initialBlend;
           line.push([v[0]+nx*lateral*spread,v[1]+vertical*spread,v[2]+nz*lateral*spread]);
         }
         return line;
