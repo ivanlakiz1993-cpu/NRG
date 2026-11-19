@@ -823,8 +823,12 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           var turn=smoothstep((k-originalRouteEnd)/90),a=at(k-1),b=at(k+1);
           var dx=b[0]-a[0],dz=b[2]-a[2],length=Math.hypot(dx,dz)||1;
           var nx=1-turn+(-dz/length)*turn,nz=(dx/length)*turn;
-          var braid=k*.055+(lane+1)*Math.PI*2/3,weave=.46*Math.sin(braid)*spread;
-          line.push([v[0]+nx*(lane*.34*spread+weave),v[1]+lane*.12*spread+.09*Math.cos(braid)*spread,v[2]+nz*(lane*.34*spread+weave)]);
+          var wireIndex=lane+1;
+          var base=[-1.38,0,1.38][wireIndex],amplitude=[.52,.92,.58][wireIndex];
+          var frequency=[.025,.018,.028][wireIndex],phase=[.7,2.35,4.65][wireIndex];
+          var lateral=base+amplitude*Math.sin(k*frequency+phase)+.12*Math.sin(k*.061+phase*1.7);
+          var vertical=lane*.055+.065*Math.cos(k*frequency*.82+phase);
+          line.push([v[0]+nx*lateral*spread,v[1]+vertical*spread,v[2]+nz*lateral*spread]);
         }
         return line;
       }
