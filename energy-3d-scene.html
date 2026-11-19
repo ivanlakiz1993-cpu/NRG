@@ -1003,8 +1003,9 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           ctx.save();ctx.globalCompositeOperation="lighter";
           building.interiorLamps.forEach(function(lamp){
             var p=projectInto(lamp[0],lamp[1],lamp[2],{});
-            if(!p.visible||!visibleAt(p.x,p.y,1/p.depth))return;
+            if(!p.visible)return;
             var radius=Math.min(76,Math.max(8,focal/p.depth*2.2));
+            if(p.x<radius+2||p.x>width-radius-2||p.y<radius+2||p.y>height-radius-2||!visibleAt(p.x,p.y,1/p.depth))return;
             var glow=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,radius);
             glow.addColorStop(0,"rgba(255,221,171,"+(.28*lampPower)+")");
             glow.addColorStop(.38,"rgba(255,198,129,"+(.13*lampPower)+")");
