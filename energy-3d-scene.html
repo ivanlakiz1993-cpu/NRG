@@ -814,36 +814,78 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           strokePath3D(points,rgb(contourBase),.82*path.alpha,path.weight);
         });
       }
-      var lanes=[-1,0,1], colors=['#ff3848','#347fff','#ffffff'];
+      var lanes=[-1,0,1];
+      function buildRibbon(i,lane){
+        var line=[],start=i-88,end=i+4;
+        for(var k=start;k<end;k+=.65){
+          var v=at(k),spread=Math.min(1,...stops.map(stop=>Math.hypot(v[0]-stop.socket[0],v[2]-stop.front)/2.8));
+          if(k<0){v[1]+=(-k)*.035;v[2]+=(-k)*.12;}
+          var turn=smoothstep((k-originalRouteEnd)/90),a=at(k-1),b=at(k+1);
+          var dx=b[0]-a[0],dz=b[2]-a[2],length=Math.hypot(dx,dz)||1;
+          var nx=1-turn+(-dz/length)*turn,nz=(dx/length)*turn;
+          line.push([v[0]+nx*lane*.34*spread,v[1]+lane*.12*spread,v[2]+nz*lane*.34*spread]);
+        }
+        return line;
+      }
+      function ribbonPoint(line,index){
+        index=Math.max(0,Math.min(line.length-1,index));var n=Math.floor(index),t=index-n,a=line[n],b=line[Math.min(n+1,line.length-1)];
+        return a.map((v,j)=>v+(b[j]-v)*t);
+      }
+      function dischargeStroke(points,opacity){
+        if(opacity<.008)return;
+        var halo=mixColor([164,192,224],[150,169,193],backgroundLightness);
+        var core=mixColor([246,250,255],[88,104,126],backgroundLightness);
+        strokePath3D(points,rgb(halo),opacity*.09,17);
+        strokePath3D(points,rgb(halo),opacity*.24,7);
+        strokePath3D(points,rgb(core),opacity*.96,1.65);
+        strokePath3D(points,rgb(core),opacity*.88,.55);
+      }
+      function drawElectricity(ribbons,time){
+        if(reduceMotion)return;
+        // Travelling packets have smooth envelopes: no random frame-by-frame blinking.
+        ribbons.forEach(function(line,lane){
+          for(var packet=0;packet<2;packet++){
+            var seed=lane*2.17+packet*3.71,phase=(time*(.17+lane*.009)+packet*.5+lane*.24)%1;
+            var opacity=Math.pow(Math.sin(phase*Math.PI),2)*(.84+.16*Math.sin(time*4.2+seed));
+            var start=(.04+.74*phase)*(line.length-1),span=(.09+.025*Math.sin(seed))*(line.length-1),points=[];
+            for(var j=0;j<=24;j++){
+              var t=j/24,index=start+span*t,p=ribbonPoint(line,index),a=ribbonPoint(line,index-1),b=ribbonPoint(line,index+1);
+              var length=Math.hypot(b[0]-a[0],b[2]-a[2])||1,nx=-(b[2]-a[2])/length,nz=(b[0]-a[0])/length;
+              var envelope=Math.sin(t*Math.PI);
+              var jagged=.55*Math.sin(t*71+seed+time*2.3)+.28*Math.sin(t*139-seed-time*1.8);
+              var offset=envelope*(.2*Math.sin(time*1.4+seed)+.25*jagged);
+              p[0]+=nx*offset;p[2]+=nz*offset;
+              p[1]+=envelope*(.11+.16*Math.sin(t*89+seed+time*1.7));points.push(p);
+            }
+            dischargeStroke(points,opacity);
+            // A finer fork slips away from the main packet, then rejoins its rail.
+            var fork=points.slice(8,18).map((p,j)=>[p[0],p[1]+Math.sin(j/9*Math.PI)*.2,p[2]]);
+            dischargeStroke(fork,opacity*.32);
+          }
+        });
+        // Short bridges between neighbouring rails complete the electrical field.
+        for(var lane=0;lane<2;lane++){
+          var phase=(time*.21+lane*.46+.2)%1,opacity=Math.pow(Math.sin(phase*Math.PI),4)*.66;
+          var index=(.2+.6*phase)*(ribbons[lane].length-1),a=ribbonPoint(ribbons[lane],index),b=ribbonPoint(ribbons[lane+1],index+3),points=[];
+          for(var j=0;j<=18;j++){
+            var t=j/18,envelope=Math.sin(t*Math.PI);
+            points.push([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t+envelope*(.27+.09*Math.sin(t*81+time*2+lane)),a[2]+(b[2]-a[2])*t]);
+          }
+          dischargeStroke(points,opacity);
+        }
+      }
       function draw(){
         strokeCache=new WeakMap();
         const i=scrollProgress*(route.length-1),head=at(i);
         camera(i);drawBackground();skyContext.drawImage(canvas,0,0);drawStreetscape(head);
-        // Far-to-near order keeps the roof and facade silhouettes coherent.
-        // The four oversized flat elevations are omitted; the side buildings frame the open corridor.
-        lanes.forEach(function(lane,laneIndex){
-          var line=[];
-          // Constant-length luminous ribbons, with fractional endpoints: no disappearing pulses.
-          var start=i-88,end=i+4;
-          for(var k=start;k<end;k+=.65){
-            var v=at(k),spread=Math.min(1,...stops.map(stop=>Math.hypot(v[0]-stop.socket[0],v[2]-stop.front)/2.8));
-            if(k<0){v[1]+=(-k)*.035;v[2]+=(-k)*.12}
-            var turn=smoothstep((k-originalRouteEnd)/90),a=at(k-1),b=at(k+1);
-            var dx=b[0]-a[0],dz=b[2]-a[2],length=Math.hypot(dx,dz)||1;
-            var nx=1-turn+(-dz/length)*turn,nz=(dx/length)*turn;
-            line.push([v[0]+nx*lane*.34*spread,v[1]+lane*.12*spread,v[2]+nz*lane*.34*spread]);
-          }
-          var color=colors[laneIndex];
-          ctx.save();ctx.globalCompositeOperation='source-over';
-          strokePath3D(line,color,.07,17);strokePath3D(line,color,.17,7);
-          strokePath3D(line,color,1,2.3);strokePath3D(line,'#ffffff',.72,.65);
-          if(!reduceMotion){
-            var phase=(performance.now()*.00022+laneIndex*.29)%1;
-            var mark=Math.floor(phase*(line.length-12));
-            strokePath3D(line.slice(mark,mark+12),'#ffffff',.8,2.1);
-          }
-          ctx.restore();
+        var ribbons=lanes.map(lane=>buildRibbon(i,lane));
+        var grey=mixColor([158,163,171],[93,100,111],backgroundLightness);
+        ribbons.forEach(function(line){
+          // Neutral conductors remain visible while light travels around them.
+          strokePath3D(line,rgb(contourHalo),.16,2.8);
+          strokePath3D(line,rgb(grey),.82,1.15);
         });
+        drawElectricity(ribbons,performance.now()/1000);
       }
       function render(time) { draw(time); }
 
