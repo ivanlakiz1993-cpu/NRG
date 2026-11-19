@@ -10,7 +10,7 @@
     html, body { margin: 0; min-height: 100%; background: #000000; }
     html { scrollbar-color: #777777 #000000; }
     body { overflow-x: hidden; }
-    .flight { position: relative; height: 1150svh; }
+    .flight { position: relative; height: 1550svh; }
     .screen {
       position: sticky; top: 0; width: 100%; height: 100svh; min-height: 0;
       overflow: hidden; background: #000000; isolation: isolate;
@@ -22,7 +22,7 @@
     canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
     @media (max-width: 700px) {
       .screen { min-height: 0; }
-      .flight { height: 980svh; }
+      .flight { height: 1320svh; }
     }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
@@ -96,7 +96,10 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         [-16,1.35,-21.4],[-13,1.35,-22.4],[-12,1.65,-25],[-8,2.5,-33],
         [4,2,-40],[9,1.35,-46],stops[1].socket,[8,1.35,-51],
         [3,1.35,-53],[0,1.65,-55],[-2,2.1,-61],[0,2.8,-68],[-9,1.5,-76],stops[2].socket,[-12,1.35,-84],[-8,1.7,-89],[0,2.4,-99],[8,1.35,-110],stops[3].socket,[7,1.35,-118],[0,2,-126],[0,3,-143],
-        [0,3,-160],[3,3,-174],[14,3,-183],[33,3,-185],[56,3,-185],[76,3,-185],[80,3,-185]
+        [0,3,-160],[3,3,-174],[14,3,-183],[33,3,-185],[56,3,-185],[76,3,-185],[80,3,-185],
+        [78,3,-191],[73,3,-199],[70,3,-209],[70,3,-222],[70,3,-239],[72,3,-253],
+        [79,3,-265],[89,3,-273],[100,3,-280],[100,3,-296],[100,3,-314],
+        [104,3,-331],[112,3,-345]
       ],36);      function at(i){i=Math.max(0,Math.min(route.length-1,i));var k=Math.floor(i),a=route[k],b=route[Math.min(k+1,route.length-1)];return a.map((v,j)=>v+(b[j]-v)*(i-k))}
       var originalRouteEnd=26*36;
       function camera(i){
@@ -116,6 +119,15 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         cameraForward=unit([targetX-cameraX,targetY-cameraY,targetZ-cameraZ]);
         var f=cameraForward,r=cameraRight=unit([-f[2],0,f[0]]);
         cameraUp=[-r[2]*f[1],r[2]*f[0]-r[0]*f[2],r[0]*f[1]];
+      }
+      var currentRouteIndex=0;
+      function nearestRouteIndex(x,z,start){
+        var best=start||originalRouteEnd,bestDistance=Infinity;
+        for(var i=Math.max(0,start||originalRouteEnd);i<route.length;i+=2){
+          var dx=route[i][0]-x,dz=route[i][2]-z,distance=dx*dx+dz*dz;
+          if(distance<bestDistance){bestDistance=distance;best=i;}
+        }
+        return best;
       }
       var scratchA={x:0,y:0,scale:0,visible:false};
       var scratchB={x:0,y:0,scale:0,visible:false};
@@ -547,6 +559,11 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       }
       var finalFactory={x:0,z:0,w:56,depth:20,h:25,side:1,variant:8,seed:42,final:true};
       streetscape.push(finalFactory);
+      var firstPlant={x:20,z:-219,w:54,depth:44,h:39,side:-1,variant:7,seed:61,industrial:true};
+      firstPlant.routeIndex=nearestRouteIndex(70,-220,originalRouteEnd+80);
+      var secondPlant={x:166,z:-280,w:62,depth:48,h:45,side:1,variant:6,seed:74,industrial:true};
+      secondPlant.routeIndex=nearestRouteIndex(100,-280,firstPlant.routeIndex+100);
+      streetscape.push(firstPlant,secondPlant);
       streetscape.forEach(function(b){
         b.faces=makeArchitecture(b);
         if(b.final){
@@ -564,7 +581,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         if(building.final)return smoothstep((scrollProgress*(route.length-1)-originalRouteEnd+25)/150);
         if(reduceMotion)return scrollProgress>.001?1:0;
         var opening=smoothstep((scrollProgress-.008)/.055);
-        var distance=head[2]-building.z;
+        var distance=building.routeIndex===undefined?head[2]-building.z:building.routeIndex-currentRouteIndex;
         var stagger=building.side===1?3.2:0;
         var rise=smoothstep((38-distance-stagger)/17);
         return opening*rise;
@@ -589,8 +606,9 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var queue=[],active=[];
         function faceDepth(face){return (face.mid[0]-cameraX)*cameraForward[0]+(face.mid[1]-cameraY)*cameraForward[1]+(face.mid[2]-cameraZ)*cameraForward[2]}
         streetscape.forEach(function(building){
-          var ahead=head[2]-building.z,grow=drawingProgress(building,head),leave=building.final?1:1-smoothstep((-ahead-2)/19);
-          if(grow<=0||leave<=0||(!building.final&&building.z>cameraZ-4))return;
+          var ahead=building.routeIndex===undefined?head[2]-building.z:building.routeIndex-currentRouteIndex;
+          var grow=drawingProgress(building,head),leave=building.final?1:1-smoothstep((-ahead-2)/19);
+          if(grow<=0||leave<=0||(!building.final&&building.routeIndex===undefined&&building.z>cameraZ-4))return;
           active.push(building);
           var roofHeight=Math.max(...building.faces.flatMap(f=>f.points.map(p=>p[1])));
           var fade=(building.final?1:(.55+.45*(1-smoothstep((ahead-8)/62))))*Math.min(1,grow*6)*leave;
@@ -673,7 +691,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       }
       function drawPlotDetails(building,head){
         if(building.final){drawFactoryDetails(building,head);return;}
-        var grow=drawingProgress(building,head),ahead=head[2]-building.z;
+        var grow=drawingProgress(building,head),ahead=building.routeIndex===undefined?head[2]-building.z:building.routeIndex-currentRouteIndex;
         if(grow<=0||ahead>45||ahead< -18)return;
         var leave=1-smoothstep((-ahead-2)/19),x=building.x,z=building.z,w=building.w,d=building.depth;
         var bounds=building.bounds,front=bounds.maxZ,paths=[];
@@ -970,6 +988,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       function draw(){
         strokeCache=new WeakMap();
         const i=scrollProgress*(route.length-1),head=at(i);
+        currentRouteIndex=i;
         camera(i);
         if(!openingCamera){camera(0);openingCamera={x:cameraX,y:cameraY,z:cameraZ,forward:cameraForward.slice(),right:cameraRight.slice(),up:cameraUp.slice()};camera(i);}
         drawBackground();skyContext.drawImage(canvas,0,0);drawStreetscape(head);
