@@ -867,10 +867,16 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             }
             line([[-26.5,.04,bayZ],[20,.04,bayZ]],.7,.4,.25);
           }
-          // Low-voltage feeders branch from the nearest outer cable at each production bay.
+          // Three cables share a shallow, protected service channel from entrance to exit.
+          for(var trayX of [-2.35,2.35]){
+            line([[trayX,.12,8],[trayX,.12,-108]],.58,1,.85);
+            line([[trayX,.02,8],[trayX,.02,-108]],.62,.5,.6);
+          }
+          for(var trayZ=6;trayZ>=-106;trayZ-=3)line([[-2.35,.08,trayZ],[2.35,.08,trayZ]],.64,.45,.45);
+          // Low-voltage feeders leave the channel at each production bay, never across the camera path.
           for(var feed of [[-7,-16],[19,-36],[-8,-53],[19,-77]]){
             var fx=feed[0],fz=feed[1],side=fx<0?-1:1;
-            var feeder=[[factoryCableOffset(side<0?0:2,84-fz),.14,fz],[fx,.14,fz],[fx,2.8,fz]];
+            var feeder=[[side*2.1,.14,fz],[fx,.14,fz],[fx,2.8,fz]];
             line(feeder,.8,1,.65);
             building.powerBranches.push({points:feeder.map(worldPoint),entry:84-fz,indicator:[[fx-.15,2.8,fz],[fx+.15,2.8,fz]].map(worldPoint)});
           }
@@ -1161,17 +1167,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
 
       }
       var lanes=[-1,0,1];
-      var cableBase=[-1.55,0,1.55];
-      function factoryCableShape(wireIndex,worldX){
-        // 0 at both portals; the outer cables swing outwards in opposite phase, the middle one weaves.
-        var p=(worldX-84)/100;
-        if(p<=0||p>=1)return 0;
-        var e=Math.pow(Math.sin(Math.PI*p),.8);
-        if(wireIndex===0)return -e*(2.4+Math.sin(4*Math.PI*p));
-        if(wireIndex===2)return e*(2.4+Math.sin(4*Math.PI*p+Math.PI));
-        return e*1.8*Math.sin(3*Math.PI*p);
-      }
-      function factoryCableOffset(wireIndex,worldX){return cableBase[wireIndex]+factoryCableShape(wireIndex,worldX);}
       function openingPoint(curve,t){
         var scaled=Math.max(0,Math.min(1,t))*(curve.length-1),index=Math.min(curve.length-2,Math.floor(scaled)),u=scaled-index;
         var p0=curve[Math.max(0,index-1)],p1=curve[index],p2=curve[index+1],p3=curve[Math.min(curve.length-1,index+2)];
@@ -1214,7 +1209,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           var turn=smoothstep((k-originalRouteEnd)/90),a=at(k-1),b=at(k+1);
           var dx=b[0]-a[0],dz=b[2]-a[2],length=Math.hypot(dx,dz)||1;
           var nx=1-turn+(-dz/length)*turn,nz=(dx/length)*turn;
-          var base=cableBase[wireIndex],amplitude=[.18,.24,.18][wireIndex];
+          var base=[-1.55,0,1.55][wireIndex],amplitude=[.18,.24,.18][wireIndex];
           var frequency=[.021,.017,.024][wireIndex],phase=[.7,2.35,4.65][wireIndex];
           var lateral=base+amplitude*Math.sin(k*frequency+phase)+.04*Math.sin(k*.052+phase*1.7);
           var attachment=[0,0,0];
@@ -1225,8 +1220,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             attachment[wireIndex]+=offsets[wireIndex]*influence;
           });
           lateral+=attachment[wireIndex];
-          // Inside the final workshop the three cables fan out on separate paths.
-          lateral+=factoryCableShape(wireIndex,v[0])*turn;
           var vertical=lane*.055+.065*Math.cos(k*frequency*.82+phase);
           var p=[v[0]+nx*lateral,v[1]+vertical,v[2]+nz*lateral];
           openingBlend=1-smoothstep((k-4)/112);
@@ -1248,56 +1241,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           points.push([p[0]+nx*side,p[1]+up,p[2]+nz*side]);
         }
         return points;
-      }
-      // A volumetric cable: black body, contour silhouettes, top highlight and clamp rings.
-      // Each segment is depth-tested so walls and machines still hide the cable.
-      function drawTube(line,radius){
-        var samples=line.map(function(p){
-          var q=projectInto(p[0],p[1],p[2],{});
-          q.ok=q.visible&&q.x>-60&&q.x<width+60&&q.y>-60&&q.y<height+60&&visibleAt(q.x,q.y,1/q.depth);
-          return q;
-        });
-        var runs=[],run=[];
-        for(var i=0;i<samples.length;i++){
-          if(samples[i].ok)run.push(i);
-          else{if(run.length>1)runs.push(run);run=[];}
-        }
-        if(run.length>1)runs.push(run);
-        var contour=rgb(contourBase);
-        runs.forEach(function(run){
-          var left=[],right=[],normals=[];
-          run.forEach(function(index,n){
-            var a=samples[run[Math.max(0,n-1)]],b=samples[run[Math.min(run.length-1,n+1)]],q=samples[index];
-            var dx=b.x-a.x,dy=b.y-a.y,l=Math.hypot(dx,dy)||1,nx=-dy/l,ny=dx/l;
-            // Keep the normal continuous along the run so the silhouettes never swap sides.
-            var previousNormal=normals[n-1];
-            if(previousNormal?nx*previousNormal[0]+ny*previousNormal[1]<0:ny>0){nx=-nx;ny=-ny;}
-            var half=Math.max(1.3,Math.min(6.5,radius*q.scale));
-            normals.push([nx,ny,half,dx/l,dy/l]);
-            left.push([q.x+nx*half,q.y+ny*half]);right.push([q.x-nx*half,q.y-ny*half]);
-          });
-          ctx.save();
-          ctx.beginPath();
-          left.forEach((p,n)=>n?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));
-          for(var n=right.length-1;n>=0;n--)ctx.lineTo(right[n][0],right[n][1]);
-          ctx.closePath();ctx.fillStyle='#000';ctx.globalAlpha=1;ctx.fill();
-          ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle=contour;
-          ctx.globalAlpha=.9;ctx.lineWidth=.9;
-          for(var edge of [left,right]){ctx.beginPath();edge.forEach((p,n)=>n?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.stroke();}
-          // A soft highlight along the upper third suggests a round section.
-          ctx.globalAlpha=.32;ctx.lineWidth=.6;ctx.beginPath();
-          run.forEach(function(index,n){var q=samples[index],m=normals[n],x=q.x+m[0]*m[2]*.45,y=q.y+m[1]*m[2]*.45;n?ctx.lineTo(x,y):ctx.moveTo(x,y);});
-          ctx.stroke();
-          // Clamp rings every few metres, drawn as curved cross-sections.
-          ctx.globalAlpha=.7;ctx.lineWidth=.7;
-          for(var n=2;n<run.length-2;n++){
-            var kv=line.routeStart+run[n]*line.routeStep;if(Math.floor(kv/4)===Math.floor((kv-line.routeStep)/4))continue;
-            var q=samples[run[n]],m=normals[n],bend=m[2]*.45;
-            ctx.beginPath();ctx.moveTo(left[n][0],left[n][1]);
-            ctx.quadraticCurveTo(q.x+m[3]*bend,q.y+m[4]*bend,right[n][0],right[n][1]);ctx.stroke();
-          }
-          ctx.restore();
-        });
       }
       function drawConductors(ribbons){
         var body=mixColor([120,120,120],[96,96,96],backgroundLightness);
@@ -1367,9 +1310,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         for(var lane=0;lane<2;lane++){
           var phase=(time*.14+lane*.46+.2)%1,opacity=Math.pow(Math.sin(phase*Math.PI),2)*.5*.84;
           var index=(.2+.6*phase)*(ribbons[lane].length-1),a=ribbonPoint(ribbons[lane],index),b=ribbonPoint(ribbons[lane+1],index+3),points=[];
-          // Arcs only jump where cables run close; spread-out cables stay quiet.
-          opacity*=1-smoothstep((Math.hypot(b[0]-a[0],b[2]-a[2])-1.4)/1.2);
-          if(opacity<.012)continue;
           for(var j=0;j<=28;j++){
             var t=j/28,envelope=Math.sin(t*Math.PI);
             var jitter=.045*Math.sin(t*49+time*3.1+lane)+.025*Math.sin(t*93-time*2.2);
@@ -1385,7 +1325,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         if(!openingCamera){camera(0);openingCamera={x:cameraX,y:cameraY,z:cameraZ,forward:cameraForward.slice(),right:cameraRight.slice(),up:cameraUp.slice()};camera(i);}
         drawBackground();skyContext.drawImage(canvas,0,0);drawStreetscape(head);
         var ribbons=lanes.map(lane=>buildRibbon(i,lane));
-        ribbons.forEach(function(line){drawTube(line,.12);});
+        drawConductors(ribbons);
         drawElectricity(ribbons,performance.now()/1000);
       }
       function render(time) { draw(time); }

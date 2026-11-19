@@ -38,11 +38,8 @@ $checks = @'
         captures.push({name:'workshop',image:canvas.toDataURL('image/png')});
         for(var lane of [-1,0,1]){
           var cable=buildRibbon(currentRouteIndex,lane).filter(p=>p[0]>=84&&p[0]<=184);
-          check(cable.length>0&&cable.every(p=>Math.abs(p[2]+185)<(p[0]<89||p[0]>179?3:5.5)&&p[1]>.05&&p[1]<.5),'Cable '+lane+' clears both portals and stays in the aisle');
+          check(cable.length>0&&cable.every(p=>Math.abs(p[2]+185)<2.1&&p[1]>.05&&p[1]<.5),'Cable '+lane+' clears both portals and stays in channel');
         }
-        var outerA=buildRibbon(currentRouteIndex,-1),outerB=buildRibbon(currentRouteIndex,1),spread=0;
-        outerA.forEach(function(p,n){if(p[0]>84&&p[0]<184&&outerB[n])spread=Math.max(spread,Math.abs(outerB[n][2]-p[2]));});
-        check(spread>5,'Cables fan out on separate paths inside the workshop');
         moveTo(201);
         check(factoryPower(184,0)===1,'Rear facade powers after energy exits');
         captures.push({name:'exit',image:canvas.toDataURL('image/png')});
