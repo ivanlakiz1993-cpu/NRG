@@ -100,7 +100,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         [86,3,-185.6],[91.3,3,-189.7],[94.8,3,-195],[96,3,-201],
         [96,3,-216],[96,3,-232],[96,3,-246],[97,3,-255],[100,3,-263],
         [106,3,-270],[115,3,-276],[122,3,-282],[122,3,-298],[122,3,-316],
-        [126,3,-334],[134,3,-350]
+        [122,3,-334],[122,3,-348],[122,3,-352],[126,3,-364],[136,3,-377]
       ],36);      function at(i){i=Math.max(0,Math.min(route.length-1,i));var k=Math.floor(i),a=route[k],b=route[Math.min(k+1,route.length-1)];return a.map((v,j)=>v+(b[j]-v)*(i-k))}
       var originalRouteEnd=26*36;
       var routeDistances=[0];
@@ -461,7 +461,30 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             prism([[x0,front],[x1,front],[x1,back],[x0,back]],base,[base+Math.sin(a)*rise,base+Math.sin(b)*rise,base+Math.sin(b)*rise,base+Math.sin(a)*rise],false);
           }
         }
-        if(building.variant===8){
+        if(building.interior){
+          var half=w*.5,wall=.55,door=8.2,back=-d;
+          // Open-roof production hall with clear portals at both ends of the cable aisle.
+          box(-half,-half+wall,0,h,0,back,false);
+          box(half-wall,half,0,h,0,back,false);
+          box(-half,-door,0,h,0,-wall,false);box(door,half,0,h,0,-wall,false);
+          box(-door,door,h*.76,h,0,-wall,false);
+          box(-half,-door,0,h,back+wall,back,false);box(door,half,0,h,back+wall,back,false);
+          box(-door,door,h*.76,h,back+wall,back,false);
+          // Both portal leaves are swung into the hall, keeping the cable aisle clear.
+          prism([[-door,-.2],[-door+.38,-.2],[-door+.38,-door+.3],[-door,-door+.3]],0,h*.76,false);
+          prism([[door-.38,-.2],[door,-.2],[door,-door+.3],[door-.38,-door+.3]],0,h*.76,false);
+          prism([[-door,back+.2],[-door+.38,back+.2],[-door+.38,back+door-.3],[-door,back+door-.3]],0,h*.76,false);
+          prism([[door-.38,back+.2],[door,back+.2],[door,back+door-.3],[door-.38,back+door-.3]],0,h*.76,false);
+          // Three distinct production bays: machining, a press line and pump/electrical skids.
+          box(-21,-12,0,5.4,-10,-22,false);box(-20,-13,5.4,7.2,-11,-20,false);
+          box(-23,-21,0,4.2,-11,-15,false);box(-23,-21,0,4.2,-17,-21,false);
+          box(10,21,0,2.2,-28,-40,false);box(11,12,2.2,10,-29,-30,false);box(19,20,2.2,10,-29,-30,false);
+          box(10,21,9.2,10,-28.4,-30.6,false);box(13.2,17.8,3.4,8.8,-30,-33,false);
+          box(-4,4,1.3,2.2,-43,-61,false);
+          for(var z=-45;z>=-59;z-=4){box(-4.3,-3.8,0,1.35,z+.25,z-.25,false);box(3.8,4.3,0,1.35,z+.25,z-.25,false);}
+          box(-19,-11,0,1.2,-49,-61,false);box(-18,-12,1.2,3.4,-51,-58,false);
+          for(var cabinet=0;cabinet<5;cabinet++)box(22,25,0,5.5,-8-cabinet*11,-12-cabinet*11,false);
+        }else if(building.variant===8){
           // Long-span vaulted hall, rounded administration wing and an asymmetric service tower.
           roundBox(-29,22,0,20,0,-28,2.8,true);
           vault(-28,21,20,9,-2,-26);
@@ -582,9 +605,9 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       var firstPlant={x:43,z:-201,w:54,depth:44,h:39,side:-1,variant:7,seed:61,industrial:true};
       firstPlant.routeIndex=nearestRouteIndex(96,-201,originalRouteEnd+80);
       firstPlant.routeEndIndex=nearestRouteIndex(96,-245,firstPlant.routeIndex+1);
-      var secondPlant={x:158,z:-280,w:62,depth:48,h:45,side:1,variant:6,seed:74,industrial:true};
+      var secondPlant={x:122,z:-280,w:52,depth:72,h:18,side:1,variant:10,seed:74,industrial:true,interior:true};
       secondPlant.routeIndex=nearestRouteIndex(122,-280,firstPlant.routeEndIndex+1);
-      secondPlant.routeEndIndex=nearestRouteIndex(122,-328,secondPlant.routeIndex+1);
+      secondPlant.routeEndIndex=nearestRouteIndex(122,-352,secondPlant.routeIndex+1);
       streetscape.push(firstPlant,secondPlant);
       streetscape.forEach(function(b){
         b.faces=makeArchitecture(b);
@@ -719,8 +742,66 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         });
         active.forEach(building=>drawPlotDetails(building,head));
       }
+      function drawInteriorDetails(building,head){
+        var grow=drawingProgress(building,head),ahead=building.routeIndex-currentRouteIndex;
+        var tail=routeDistances[building.routeEndIndex]+cameraTrailDistance-routeDistanceAt(currentRouteIndex);
+        if(grow<=0||ahead>45||tail< -10)return;
+        var leave=buildingLeave(building,ahead),reveal=Math.min(1,grow*5),x=building.x,z=building.z;
+        if(!building.interiorPaths){
+          var paths=[];
+          function line(points,weight,alpha){paths.push({points:points.map(p=>[x+p[0],p[1],z+p[2]]),weight:weight||.65,alpha:alpha===undefined?1:alpha});}
+          var half=building.w*.5-.9,roof=building.h-.8;
+          // Open roof ribs, overhead cable trays and a marked central aisle.
+          for(var bay=-6;bay>-building.depth+3;bay-=10){
+            line([[-half,roof,bay],[0,roof-3.2,bay],[half,roof,bay]],.8);
+            line([[-half,roof,bay],[0,roof-1.1,bay],[half,roof,bay]],.45);
+            line([[0,roof-3.2,bay],[0,roof,bay]],.45);
+          }
+          for(var side of [-1,1]){
+            line([[side*10,roof-.25,-4],[side*10,roof-.25,-building.depth+4]],.65);
+            line([[side*half,roof-.25,-4],[side*half,roof-.25,-building.depth+4]],.45);
+          }
+          line([[-5,.08,-3],[-5,.08,-building.depth+3]],.45,.75);
+          line([[5,.08,-3],[5,.08,-building.depth+3]],.45,.75);
+          // Guards, control panels and service rails around each machine bay.
+          for(var panel=0;panel<5;panel++){
+            var px=22.7,pz=-9-panel*11;
+            line([[px,1,pz],[px,4.8,pz],[px+1.5,4.8,pz],[px+1.5,1,pz],[px,1,pz]],.65);
+            for(var button=0;button<3;button++)line([[px+.25+button*.38,4.1,pz-.04],[px+.25+button*.38,4.3,pz-.04]],.8,1);
+          }
+          line([[-21,2,-11],[-21,5,-11],[-16,5,-11],[-16,2,-11],[-21,2,-11]],.75);
+          for(var slot=0;slot<5;slot++)line([[-20.5+slot*.8,2.6,-11.05],[-20.5+slot*.8,3.7,-11.05]],.45);
+          line([[9,10.2,-28],[22,10.2,-28],[22,9.5,-40],[9,9.5,-40]],.85);
+          line([[10,2.3,-28.3],[21,2.3,-28.3]],.55);
+          line([[-4.4,2.35,-43],[-4.4,2.35,-61],[4.4,2.35,-61],[4.4,2.35,-43]],.7);
+          for(var zBay=-46;zBay>=-58;zBay-=4)line([[-4.6,2,zBay],[4.6,2,zBay]],.5);
+          building.interiorPaths=paths;
+          building.interiorLamps=Array.from({length:7},(_,i)=>[x,building.h-.55,z-6-i*9]);
+        }
+        building.interiorPaths.forEach(function(path){
+          var points=partialPath3D(path.points,reveal);
+          strokePath3D(points,rgb(contourHalo),leave*.12,1.7);
+          strokePath3D(points,rgb(contourBase),leave*path.alpha,path.weight);
+        });
+        var lampPower=smoothstep((grow-.32)/.34)*leave;
+        if(lampPower<=.01)return;
+        ctx.save();ctx.globalCompositeOperation="lighter";
+        building.interiorLamps.forEach(function(lamp){
+          var p=projectInto(lamp[0],lamp[1],lamp[2],{});
+          if(!p.visible||!visibleAt(p.x,p.y,1/p.depth))return;
+          var radius=Math.min(72,Math.max(7,focal/p.depth*1.7));
+          var glow=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,radius);
+          glow.addColorStop(0,"rgba(255,211,151,"+(.23*lampPower)+")");
+          glow.addColorStop(.32,"rgba(255,197,126,"+(.095*lampPower)+")");
+          glow.addColorStop(1,"rgba(255,190,112,0)");
+          ctx.fillStyle=glow;ctx.fillRect(p.x-radius,p.y-radius,radius*2,radius*2);
+          ctx.fillStyle="rgba(255,228,184,"+(.82*lampPower)+")";ctx.fillRect(p.x-radius*.18,p.y-1.1,Math.max(2,radius*.36),2.2);
+        });
+        ctx.restore();
+      }
       function drawPlotDetails(building,head){
         if(building.final){drawFactoryDetails(building,head);return;}
+        if(building.interior){drawInteriorDetails(building,head);return;}
         var grow=drawingProgress(building,head),ahead=building.routeIndex===undefined?head[2]-building.z:building.routeIndex-currentRouteIndex;
         var detailTail=building.routeEndIndex===undefined?ahead:routeDistances[building.routeEndIndex]+cameraTrailDistance-routeDistanceAt(currentRouteIndex);
         if(grow<=0||ahead>45||detailTail<(building.routeEndIndex===undefined?-18:-10))return;
