@@ -815,8 +815,18 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         });
       }
       var lanes=[-1,0,1];
+      function ribbonStart(i){
+        var minimum=i-380;
+        for(var k=i-88;k>minimum;k-=4){
+          var p=at(k);
+          if(k<0){p[1]+=(-k)*.035;p[2]+=(-k)*.12;}
+          if(worldDepth(p)<-18)return k;
+        }
+        return minimum;
+      }
       function buildRibbon(i,lane){
-        var line=[],start=i-88,end=i+4;
+        var line=[],start=ribbonStart(i),end=i+4;
+        line.activeStart=(i-88-start)/.65;line.activeLength=92/.65;
         for(var k=start;k<end;k+=.65){
           var v=at(k),spread=Math.min(1,...stops.map(stop=>Math.hypot(v[0]-stop.socket[0],v[2]-stop.front)/2.8));
           if(k<0){v[1]+=(-k)*.035;v[2]+=(-k)*.12;}
@@ -889,7 +899,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             var phase=(time*speed+offset)%1;
             phase=(phase+1)%1;
             var opacity=(.48+.28*(.5+.5*Math.sin(time*(2.5+lane*.7)+seed)))*.84;
-            var span=(.2+.025*Math.sin(seed))*(line.length-1),start=phase*(line.length-1-span),points=[];
+            var span=(.2+.025*Math.sin(seed))*line.activeLength,start=line.activeStart+phase*(line.activeLength-span),points=[];
             for(var j=0;j<=54;j++){
               var t=j/54,index=start+span*t,p=ribbonPoint(line,index),a=ribbonPoint(line,index-1),b=ribbonPoint(line,index+1);
               var length=Math.hypot(b[0]-a[0],b[2]-a[2])||1,nx=-(b[2]-a[2])/length,nz=(b[0]-a[0])/length;
