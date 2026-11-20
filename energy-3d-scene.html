@@ -1216,7 +1216,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           stops.forEach(function(stop){
             var distance=Math.hypot(v[0]-stop.socket[0],v[2]-stop.front);
             var influence=1-smoothstep((distance-2)/14);
-            var offsets=stop.kind===0?[-.3,-.05,2.9]:[-2.0,-2.1,.1];
+            var offsets=stop===stops[0]?[-.3,-.05,-3.2]:stop.kind===0?[-.3,-.05,2.9]:[-2.0,-2.1,.1];
             attachment[wireIndex]+=offsets[wireIndex]*influence;
           });
           lateral+=attachment[wireIndex];
