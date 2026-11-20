@@ -700,6 +700,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       }
       function drawStreetscape(head){
         var time=reduceMotion?0:performance.now()*.00035;
+        var insideFactory=cameraX>84&&cameraX<184&&cameraZ>-214&&cameraZ<-163;
         var queue=[],active=[],factoryWindows=[];
         function faceDepth(face){return (face.mid[0]-cameraX)*cameraForward[0]+(face.mid[1]-cameraY)*cameraForward[1]+(face.mid[2]-cameraZ)*cameraForward[2]}
         streetscape.forEach(function(building){
@@ -732,7 +733,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               var amount=smoothstep((grow-.5-pane.points[0][1]/roofHeight*.18)/.25);
               // Light a complete window row together so two mullioned halves never disagree.
               var paneX=pane.points.reduce((sum,p)=>sum+p[0]/pane.points.length,0);
-              var light=building.final?factoryPower(paneX,pane.row):smoothstep((building.z-head[2]-.07*pane.row)/1.2);
+              var light=insideFactory?0:building.final?factoryPower(paneX,pane.row):smoothstep((building.z-head[2]-.07*pane.row)/1.2);
               if(light>0&&amount>.95){
                 // Interior lamps keep a soft warm-white tone, independent of contour polarity.
                 var lamp=mixColor([255,218,157],[239,185,112],backgroundLightness);
@@ -847,15 +848,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           function panel(points,stage,color){panels.push({points:points.map(worldPoint),stage:stage,color:color});}
           function ring(x,y,z,r,stage){var points=[];for(var k=0;k<=48;k++){var angle=k/48*Math.PI*2;points.push([x+Math.cos(angle)*r,y,z+Math.sin(angle)*r]);}line(points,stage,.65);}
           building.powerBranches=[];
-          building.interiorWindows=[];
-          building.faces.forEach(function(face){
-            for(var pane of face.windows){
-              var wallZ=pane.points[0][2];
-              if((Math.abs(wallZ+214)<.01||Math.abs(wallZ+163)<.01)&&pane.points.every(p=>Math.abs(p[2]-wallZ)<.01&&p[1]<20)){
-                building.interiorWindows.push({points:pane.points.map(p=>[p[0],p[1],p[2]+(wallZ<-185?.55:-.55)]),row:pane.row});
-              }
-            }
-          });
           // A continuous workshop shell: dark floor and inward-facing walls, with an open drive-through aisle.
           panel([[-28.5,0,-.15],[21.5,0,-.15],[21.5,0,-99.85],[-28.5,0,-99.85]],.5,'#080c12');
           panel([[-28.5,0,-3],[-28.5,19.8,-3],[-28.5,19.8,-97],[-28.5,0,-97]],.55,'#05080d');
@@ -1141,11 +1133,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           var amount=detailAmount(grow,item.stage);
           // Every solid is pure black; only contour lines, light and electricity carry colour.
           if(amount>.01)fillSurface3D(item.points,'#000',amount);
-        });
-        building.interiorWindows.forEach(function(pane){
-          var power=factoryPower(pane.points.reduce((sum,p)=>sum+p[0]/4,0),pane.row);
-          fillSurface3D(pane.points,'#ffe0a3',power*.56*detailAmount(grow,.72));
-          strokePath3D(pane.points.concat([pane.points[0]]),rgb(contourBase),detailAmount(grow,.72)*.65,.65);
         });
         building.detailPaths.forEach(function(path){
           var points=partialPath3D(path.points,detailAmount(grow,path.stage));
