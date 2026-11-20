@@ -1246,8 +1246,9 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var body=mixColor([120,120,120],[96,96,96],backgroundLightness);
         var bright=mixColor([200,200,200],[126,126,126],backgroundLightness);
         var dark=mixColor([68,68,68],[111,111,111],backgroundLightness);
+        var outline=mixColor([74,74,74],[5,5,5],backgroundLightness);
         ribbons.forEach(function(line,lane){
-          strokePath3D(line,'#050505',.8,4.2);
+          strokePath3D(line,rgb(outline),.8,4.2);
           strokePath3D(line,rgb(body),.9,2.35);
           for(var strand=0;strand<3;strand++){
             var strandLine=wireStrand(line,lane,strand),isBright=(strand+lane)%3===0;
