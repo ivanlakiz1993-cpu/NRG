@@ -1251,21 +1251,23 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           }
         });
       }
-      function dischargeStroke(points,opacity,lane){
+      function dischargeStroke(points,opacity,lane,thickness){
         opacity*=smoothstep(scrollProgress/.025);
         if(opacity<.012)return;
+        thickness=thickness||1;
         var base=lane===undefined?[100,152,224]:wireColors[lane];
         var halo=mixColor(base,[255,255,255],.15);
         var plasma=mixColor(base,[255,255,255],.5);
         var core=mixColor(base,[255,255,255],.86);
         ctx.save();ctx.globalCompositeOperation="lighter";
-        strokePath3D(points,rgb(halo),opacity*.095,27);
-        strokePath3D(points,rgb(halo),opacity*.16,13.5);
-        strokePath3D(points,rgb(plasma),opacity*.39,5);
-        strokePath3D(points,rgb(core),opacity*.8,1.6);
-        strokePath3D(points,rgb(core),opacity*.68,.58);
+        strokePath3D(points,rgb(halo),opacity*.095,27*thickness);
+        strokePath3D(points,rgb(halo),opacity*.16,13.5*thickness);
+        strokePath3D(points,rgb(plasma),opacity*.39,5*thickness);
+        strokePath3D(points,rgb(core),opacity*.8,1.6*thickness);
+        strokePath3D(points,rgb(core),opacity*.68,.58*thickness);
         ctx.restore();
       }
+      function sparkRandom(seed){var value=Math.sin(seed*12.9898)*43758.5453;return value-Math.floor(value);}
       function drawElectricity(ribbons,time){
         if(reduceMotion)return;
         // Bursts are anchored to route positions: the cable moves past them, but sparks do not chase its tip.
@@ -1273,34 +1275,45 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           var stepSize=line.routeStep,first=line.routeStart,last=first+(line.length-1)*stepSize;
           for(var slot=Math.ceil((first+10-lane*7)/32);slot*32+lane*7<last-10;slot++){
             var anchorRoute=slot*32+lane*7,anchor=(anchorRoute-first)/stepSize;
-            var clock=time*(1.05+lane*.13)+slot*.71+lane*.37;
-            var cycle=clock-Math.floor(clock),advance=smoothstep(cycle/.68);
-            var opacity=(.38+.32*advance)*(1-smoothstep((cycle-.68)/.32));
-            if(opacity<.035||advance<=0)continue;
-            var seed=slot*7.31+lane*4.17+Math.floor(clock)*3.29,points=[];
-            var shape=((slot+lane*2)%4+4)%4,span=[17,25,31,22][shape];
-            for(var j=0;j<=30;j++){
-              var t=j/30,index=anchor+(t-.5)*span,p=ribbonPoint(line,index),a=ribbonPoint(line,index-1),b=ribbonPoint(line,index+1);
+            var source=slot*19.31+lane*37.17,rate=.48+sparkRandom(source+1)*1.7;
+            var clock=time*rate+sparkRandom(source+2),burst=Math.floor(clock),cycle=clock-burst;
+            var seed=source+burst*11.73,duty=.24+sparkRandom(seed+3)*.63;
+            if(cycle>=duty)continue;
+            var age=cycle/duty,advance=smoothstep(age/(.38+sparkRandom(seed+4)*.42));
+            var opacity=(.28+sparkRandom(seed+5)*.52)*(1-smoothstep((age-.68)/.32));
+            if(opacity<.025||advance<=0)continue;
+            var span=Math.min(10+sparkRandom(seed+6)*48,2*Math.min(anchor,line.length-1-anchor)-2);
+            if(span<6)continue;
+            var samples=12+Math.floor(sparkRandom(seed+7)*40),points=[];
+            var arch=sparkRandom(seed+8)*1.05,side=(sparkRandom(seed+9)-.5)*1.25;
+            var roughness=.08+sparkRandom(seed+10)*.42,frequency=22+sparkRandom(seed+11)*125;
+            var thickness=.52+sparkRandom(seed+12)*1.15;
+            for(var j=0;j<=samples;j++){
+              var t=j/samples,index=anchor+(t-.5)*span,p=ribbonPoint(line,index),a=ribbonPoint(line,index-1),b=ribbonPoint(line,index+1);
               var length=Math.hypot(b[0]-a[0],b[2]-a[2])||1,nx=-(b[2]-a[2])/length,nz=(b[0]-a[0])/length;
               var envelope=Math.pow(Math.sin(t*Math.PI),.6);
-              var jagged=.44*Math.sin(t*53+seed)+.25*Math.sin(t*117-seed)+.12*Math.sin(t*223+seed*.7);
-              var offset=envelope*.24*jagged+(shape===2?Math.sin(t*Math.PI*2)*.5:shape===3?envelope*.38:0);
+              var jagged=Math.sin(t*frequency+seed)+.5*Math.sin(t*frequency*2.3-seed);
+              var offset=envelope*(side*Math.sin(t*Math.PI*2)+roughness*jagged);
               p[0]+=nx*offset;p[2]+=nz*offset;
-              var arch=shape===1?.75:shape===2?.34:shape===3?.26:.08;
-              p[1]+=envelope*arch*(shape===3?.45+t:1)+envelope*(.1*Math.sin(t*47+seed)+.045*Math.sin(t*113-seed));points.push(p);
+              p[1]+=envelope*(arch*(.5+t)+roughness*.18*Math.sin(t*frequency*1.4+seed));points.push(p);
             }
-            if((slot+lane)%2)points.reverse();
-            dischargeStroke(partialPath3D(points,advance),opacity,lane);
-            for(var branch=0;branch<2+shape;branch++){
-              var branchAnchor=4+((branch*6+slot*3)%20+20)%20,direction=branch%2?1:-1,fork=[];
-              var branchLength=5+((branch*3+slot)%5+5)%5;
+            if(sparkRandom(seed+13)>.5)points.reverse();
+            dischargeStroke(partialPath3D(points,advance),opacity,lane,thickness);
+            var branchCount=Math.floor(sparkRandom(seed+14)*8);
+            for(var branch=0;branch<branchCount;branch++){
+              var branchSeed=seed+branch*5.81,branchAnchor=3+Math.floor(sparkRandom(branchSeed+1)*(samples-7));
+              var direction=sparkRandom(branchSeed+2)>.5?1:-1,fork=[];
+              var branchLength=3+Math.floor(sparkRandom(branchSeed+3)*11),reach=.12+sparkRandom(branchSeed+4)*.95;
+              var edgeA=points[branchAnchor-1],edgeB=points[branchAnchor+1];
+              var edgeLength=Math.hypot(edgeB[0]-edgeA[0],edgeB[2]-edgeA[2])||1;
+              var branchNx=-(edgeB[2]-edgeA[2])/edgeLength,branchNz=(edgeB[0]-edgeA[0])/edgeLength;
               for(var q=0;q<=branchLength;q++){
-                var u=q/branchLength,base=points[Math.min(30,branchAnchor+Math.floor(u*4))];
-                var flicker=Math.sin(u*8.4+seed+branch)*.07;
-                fork.push([base[0]+nx*direction*(u*u*(.12+(branch%4)*.055)+flicker),base[1]+u*(.08+(branch%3)*.045)+.035*Math.sin(u*12+seed+time*2.2),base[2]+nz*direction*(u*u*(.12+(branch%4)*.055)+flicker)]);
+                var u=q/branchLength,base=points[Math.min(samples,branchAnchor+Math.floor(u*4))];
+                var bend=direction*(u*u*reach+.06*Math.sin(u*13+branchSeed));
+                fork.push([base[0]+branchNx*bend,base[1]+u*(.08+reach*.25),base[2]+branchNz*bend]);
               }
-              var branchAdvance=smoothstep((advance-branchAnchor/30)/.27);
-              if(branchAdvance>0)dischargeStroke(partialPath3D(fork,branchAdvance),opacity*.3,lane);
+              var branchAdvance=smoothstep((advance-branchAnchor/samples)/(.15+sparkRandom(branchSeed+5)*.3));
+              if(branchAdvance>0)dischargeStroke(partialPath3D(fork,branchAdvance),opacity*(.18+sparkRandom(branchSeed+6)*.35),lane,thickness*(.35+sparkRandom(branchSeed+7)*.45));
             }
           }
         });
@@ -1309,17 +1322,22 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           var left=ribbons[lane],right=ribbons[lane+1],first=Math.max(left.routeStart,right.routeStart)+8;
           var last=Math.min(left.routeStart+(left.length-1)*left.routeStep,right.routeStart+(right.length-1)*right.routeStep)-8;
           for(var slot=Math.ceil((first-lane*11)/96);slot*96+lane*11<last;slot++){
-            var anchor=slot*96+lane*11,clock=time*.9+slot*.67+lane*.48;
-            var cycle=clock-Math.floor(clock),advance=smoothstep(cycle/.62);
-            var opacity=.34*(1-smoothstep((cycle-.65)/.35));
-            if(opacity<.04)continue;
+            var anchor=slot*96+lane*11,source=slot*31.9+lane*17.3;
+            var clock=time*(.5+sparkRandom(source+1)*1.5)+sparkRandom(source+2);
+            var burst=Math.floor(clock),cycle=clock-burst,seed=source+burst*9.7;
+            var duty=.2+sparkRandom(seed+3)*.65;
+            if(cycle>=duty)continue;
+            var age=cycle/duty,advance=smoothstep(age/(.3+sparkRandom(seed+4)*.5));
+            var opacity=(.18+sparkRandom(seed+5)*.36)*(1-smoothstep((age-.65)/.35));
+            if(opacity<.04||advance<=0)continue;
             var a=ribbonPoint(left,(anchor-left.routeStart)/left.routeStep),b=ribbonPoint(right,(anchor-right.routeStart)/right.routeStep),points=[];
-            for(var j=0;j<=14;j++){
-              var t=j/14,envelope=Math.sin(t*Math.PI),jitter=.045*Math.sin(t*49+slot*7+lane);
-              points.push([a[0]+(b[0]-a[0])*t+jitter,a[1]+(b[1]-a[1])*t+envelope*(slot%2?.55:.22),a[2]+(b[2]-a[2])*t+jitter]);
+            var samples=8+Math.floor(sparkRandom(seed+6)*22),arch=.1+sparkRandom(seed+7)*1.1;
+            for(var j=0;j<=samples;j++){
+              var t=j/samples,envelope=Math.sin(t*Math.PI),jitter=(.02+sparkRandom(seed+8)*.1)*Math.sin(t*(27+samples*4)+seed);
+              points.push([a[0]+(b[0]-a[0])*t+jitter,a[1]+(b[1]-a[1])*t+envelope*arch,a[2]+(b[2]-a[2])*t+jitter]);
             }
-            if(slot%2)points.reverse();
-            dischargeStroke(partialPath3D(points,advance),opacity);
+            if(sparkRandom(seed+9)>.5)points.reverse();
+            dischargeStroke(partialPath3D(points,advance),opacity,undefined,.45+sparkRandom(seed+10)*1.1);
           }
         }
       }
