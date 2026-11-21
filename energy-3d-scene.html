@@ -1268,51 +1268,52 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       }
       function drawElectricity(ribbons,time){
         if(reduceMotion)return;
-        // One travelling leader per wire; phases and directions remain independent.
+        // Bursts are anchored to route positions: the cable moves past them, but sparks do not chase its tip.
         ribbons.forEach(function(line,lane){
-          var count=1;
-          var speeds=[.19,-.15,.12],offsets=[.76,.31,.67];
-          for(var packet=0;packet<count;packet++){
-            var seed=lane*7.31+packet*4.17;
-            var phase=(time*speeds[lane]+offsets[lane])%1;
-            phase=(phase+1)%1;
-            var opacity=(.48+.28*(.5+.5*Math.sin(time*(2.5+lane*.7)+seed)))*.84;
-            var span=(.2+.025*Math.sin(seed))*(line.length-1),start=phase*(line.length-1-span),points=[];
-            for(var j=0;j<=54;j++){
-              var t=j/54,index=start+span*t,p=ribbonPoint(line,index),a=ribbonPoint(line,index-1),b=ribbonPoint(line,index+1);
+          var stepSize=line.routeStep,first=line.routeStart,last=first+(line.length-1)*stepSize;
+          for(var slot=Math.ceil((first+10-lane*7)/32);slot*32+lane*7<last-10;slot++){
+            var anchorRoute=slot*32+lane*7,anchor=(anchorRoute-first)/stepSize;
+            var clock=time*(1.05+lane*.13)+slot*.71+lane*.37;
+            var cycle=clock-Math.floor(clock),opacity=Math.pow(Math.sin(cycle*Math.PI),2)*.65;
+            if(opacity<.035)continue;
+            var seed=slot*7.31+lane*4.17+Math.floor(clock)*3.29,points=[];
+            for(var j=0;j<=30;j++){
+              var t=j/30,index=anchor+(t-.5)*24,p=ribbonPoint(line,index),a=ribbonPoint(line,index-1),b=ribbonPoint(line,index+1);
               var length=Math.hypot(b[0]-a[0],b[2]-a[2])||1,nx=-(b[2]-a[2])/length,nz=(b[0]-a[0])/length;
-              var envelope=.38+.62*Math.pow(Math.sin(t*Math.PI),.45);
-              var jagged=.44*Math.sin(t*53+seed+time*2.1)+.25*Math.sin(t*117-seed-time*1.55)+.12*Math.sin(t*223+seed*.7+time*2.8);
-              var offset=envelope*(.16*Math.sin(time*1.25+seed)+.2*jagged);
+              var envelope=Math.pow(Math.sin(t*Math.PI),.6);
+              var jagged=.44*Math.sin(t*53+seed)+.25*Math.sin(t*117-seed)+.12*Math.sin(t*223+seed*.7);
+              var offset=envelope*.24*jagged;
               p[0]+=nx*offset;p[2]+=nz*offset;
-              p[1]+=envelope*(.1*Math.sin(t*47+seed+time*1.4)+.045*Math.sin(t*113-seed-time*1.8));points.push(p);
+              p[1]+=envelope*(.1*Math.sin(t*47+seed)+.045*Math.sin(t*113-seed));points.push(p);
             }
-            var edgeFade=Math.pow(Math.sin(phase*Math.PI),.35);
-            dischargeStroke(points,opacity*edgeFade,lane);
-            // Fine, branching leaders flicker away from the bright central plasma.
-            var branchCount=packet===0?9:5;
-            for(var branch=0;branch<branchCount;branch++){
-              var anchor=5+((branch*7+packet*11+lane*3)%43),source=points[anchor],direction=(branch%2?1:-1),fork=[];
-              var branchLength=5+(branch*3+packet)%8;
+            dischargeStroke(points,opacity,lane);
+            for(var branch=0;branch<4;branch++){
+              var branchAnchor=4+(branch*6+slot*3)%20,direction=branch%2?1:-1,fork=[];
+              var branchLength=5+(branch*3+slot)%5;
               for(var q=0;q<=branchLength;q++){
-                var u=q/branchLength,base=points[Math.min(53,anchor+Math.floor(u*5))];
-                var flicker=Math.sin(u*8.4+seed+time*3.4+branch)*.07;
+                var u=q/branchLength,base=points[Math.min(30,branchAnchor+Math.floor(u*4))];
+                var flicker=Math.sin(u*8.4+seed+branch)*.07;
                 fork.push([base[0]+nx*direction*(u*u*(.12+(branch%4)*.055)+flicker),base[1]+u*(.08+(branch%3)*.045)+.035*Math.sin(u*12+seed+time*2.2),base[2]+nz*direction*(u*u*(.12+(branch%4)*.055)+flicker)]);
               }
-              dischargeStroke(fork,opacity*(.24+.26*(.5+.5*Math.sin(time*5.3+seed+branch*2.1))),lane);
+              dischargeStroke(fork,opacity*.28,lane);
             }
           }
         });
-        // Brief cross-arcs jump between neighbouring charged rails.
+        // Cross-arcs also flash at fixed route locations instead of sliding along the conductors.
         for(var lane=0;lane<2;lane++){
-          var phase=(time*.14+lane*.46+.2)%1,opacity=Math.pow(Math.sin(phase*Math.PI),2)*.5*.84;
-          var index=(.2+.6*phase)*(ribbons[lane].length-1),a=ribbonPoint(ribbons[lane],index),b=ribbonPoint(ribbons[lane+1],index+3),points=[];
-          for(var j=0;j<=28;j++){
-            var t=j/28,envelope=Math.sin(t*Math.PI);
-            var jitter=.045*Math.sin(t*49+time*3.1+lane)+.025*Math.sin(t*93-time*2.2);
-            points.push([a[0]+(b[0]-a[0])*t+jitter,a[1]+(b[1]-a[1])*t+envelope*(.17+.09*Math.sin(t*41+time*2+lane)),a[2]+(b[2]-a[2])*t+jitter]);
+          var left=ribbons[lane],right=ribbons[lane+1],first=Math.max(left.routeStart,right.routeStart)+8;
+          var last=Math.min(left.routeStart+(left.length-1)*left.routeStep,right.routeStart+(right.length-1)*right.routeStep)-8;
+          for(var slot=Math.ceil((first-lane*11)/96);slot*96+lane*11<last;slot++){
+            var anchor=slot*96+lane*11,clock=time*.9+slot*.67+lane*.48;
+            var opacity=Math.pow(Math.sin((clock-Math.floor(clock))*Math.PI),4)*.32;
+            if(opacity<.04)continue;
+            var a=ribbonPoint(left,(anchor-left.routeStart)/left.routeStep),b=ribbonPoint(right,(anchor-right.routeStart)/right.routeStep),points=[];
+            for(var j=0;j<=14;j++){
+              var t=j/14,envelope=Math.sin(t*Math.PI),jitter=.045*Math.sin(t*49+slot*7+lane);
+              points.push([a[0]+(b[0]-a[0])*t+jitter,a[1]+(b[1]-a[1])*t+envelope*.2,a[2]+(b[2]-a[2])*t+jitter]);
+            }
+            dischargeStroke(points,opacity);
           }
-          dischargeStroke(points,opacity);
         }
       }
       function draw(){
