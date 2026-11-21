@@ -1219,14 +1219,17 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           strokePath3D(line,rgb(bright),.34*reveal,.42);
         });
       }
+      var wireColors=[[0,117,190],[40,53,130],[118,183,42]];
       function drawInnerCurrent(ribbons,time){
         var reveal=smoothstep(scrollProgress/.025);
         if(reveal<=0)return;
         var speeds=[.22,-.17,.2];
         ribbons.forEach(function(line,lane){
           if(line.length<2)return;
-          strokePath3D(line,'#0054ce',.78*reveal,1.9);
-          strokePath3D(line,'#32baff',.9*reveal,1.05);
+          var color=wireColors[lane],highlight=mixColor(color,[255,255,255],.45);
+          var breath=reduceMotion?.78:.72+.16*Math.sin(time*(1.5+lane*.2)+lane*1.7);
+          strokePath3D(line,rgb(color),breath*reveal,1.9);
+          strokePath3D(line,rgb(highlight),breath*reveal,1.05);
           var travel=reduceMotion?0:time*speeds[lane];
           for(var packet=0;packet<3;packet++){
             var phase=((travel+packet/3+lane*.17)%1+1)%1;
@@ -1238,22 +1241,23 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               var alpha=Math.sin((section+.5)/6*Math.PI)*reveal,path=[];
               for(var segment=section*4;segment<=section*4+4;segment++){
                 if(segment>section*4&&(start+span*segment/24)%(line.length-1)<(start+span*(segment-1)/24)%(line.length-1)){
-                  if(path.length>1){strokePath3D(path,'#168bff',alpha*.8,1.7);strokePath3D(path,'#b4f5ff',alpha*.95,.85);}
+                  if(path.length>1){strokePath3D(path,rgb(color),alpha*.9,1.7);strokePath3D(path,rgb(highlight),alpha*.98,.85);}
                   path=[];
                 }
                 path.push(points[segment]);
               }
-              if(path.length>1){strokePath3D(path,'#168bff',alpha*.8,1.7);strokePath3D(path,'#b4f5ff',alpha*.95,.85);}
+              if(path.length>1){strokePath3D(path,rgb(color),alpha*.9,1.7);strokePath3D(path,rgb(highlight),alpha*.98,.85);}
             }
           }
         });
       }
-      function dischargeStroke(points,opacity){
+      function dischargeStroke(points,opacity,lane){
         opacity*=smoothstep(scrollProgress/.025);
         if(opacity<.012)return;
-        var halo=mixColor([82,139,255],[58,104,203],backgroundLightness);
-        var plasma=mixColor([151,190,255],[90,133,218],backgroundLightness);
-        var core=mixColor([255,255,255],[207,225,255],backgroundLightness);
+        var base=lane===undefined?[100,152,224]:wireColors[lane];
+        var halo=mixColor(base,[255,255,255],.15);
+        var plasma=mixColor(base,[255,255,255],.5);
+        var core=mixColor(base,[255,255,255],.86);
         ctx.save();ctx.globalCompositeOperation="lighter";
         strokePath3D(points,rgb(halo),opacity*.095,27);
         strokePath3D(points,rgb(halo),opacity*.16,13.5);
@@ -1284,7 +1288,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               p[1]+=envelope*(.1*Math.sin(t*47+seed+time*1.4)+.045*Math.sin(t*113-seed-time*1.8));points.push(p);
             }
             var edgeFade=Math.pow(Math.sin(phase*Math.PI),.35);
-            dischargeStroke(points,opacity*edgeFade);
+            dischargeStroke(points,opacity*edgeFade,lane);
             // Fine, branching leaders flicker away from the bright central plasma.
             var branchCount=packet===0?9:5;
             for(var branch=0;branch<branchCount;branch++){
@@ -1295,7 +1299,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
                 var flicker=Math.sin(u*8.4+seed+time*3.4+branch)*.07;
                 fork.push([base[0]+nx*direction*(u*u*(.12+(branch%4)*.055)+flicker),base[1]+u*(.08+(branch%3)*.045)+.035*Math.sin(u*12+seed+time*2.2),base[2]+nz*direction*(u*u*(.12+(branch%4)*.055)+flicker)]);
               }
-              dischargeStroke(fork,opacity*(.24+.26*(.5+.5*Math.sin(time*5.3+seed+branch*2.1))));
+              dischargeStroke(fork,opacity*(.24+.26*(.5+.5*Math.sin(time*5.3+seed+branch*2.1))),lane);
             }
           }
         });
