@@ -1285,8 +1285,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             var span=Math.min(24+sparkRandom(seed+6)*72,2*Math.min(anchor,line.length-1-anchor)-2);
             if(span<6)continue;
             var samples=25+Math.floor(sparkRandom(seed+7)*30),points=[];
-            var arch=sparkRandom(seed+8)*1.05,side=(sparkRandom(seed+9)-.5)*1.25;
-            var roughness=.16+sparkRandom(seed+10)*.5,frequency=36+sparkRandom(seed+11)*130;
+            var arch=.03+sparkRandom(seed+8)*.2,side=(sparkRandom(seed+9)-.5)*.75;
+            var roughness=.1+sparkRandom(seed+10)*.26,frequency=36+sparkRandom(seed+11)*130;
             var thickness=.52+sparkRandom(seed+12)*1.15;
             for(var j=0;j<=samples;j++){
               var t=j/samples,index=anchor+(t-.5)*span,p=ribbonPoint(line,index),a=ribbonPoint(line,index-1),b=ribbonPoint(line,index+1);
@@ -1295,24 +1295,24 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               var jagged=Math.sin(t*frequency+seed)+.5*Math.sin(t*frequency*2.3-seed);
               var offset=envelope*(side*Math.sin(t*Math.PI*2)+roughness*jagged);
               p[0]+=nx*offset;p[2]+=nz*offset;
-              p[1]+=envelope*(arch*(.5+t)+roughness*.18*Math.sin(t*frequency*1.4+seed));points.push(p);
+              p[1]+=envelope*(arch*(.5+t)+roughness*.05*Math.sin(t*frequency*1.4+seed));points.push(p);
             }
             if(sparkRandom(seed+13)>.5)points.reverse();
             var grown=partialPath3D(points,advance);
             dischargeStroke(grown,opacity*.58,lane,thickness);
             dischargeStroke(grown.slice(-Math.max(3,Math.round(samples*.14))),opacity*.7,lane,thickness*.8);
-            var branchCount=3+Math.floor(sparkRandom(seed+14)*6);
+            var branchCount=4+Math.floor(sparkRandom(seed+14)*5);
             for(var branch=0;branch<branchCount;branch++){
               var branchSeed=seed+branch*5.81,branchAnchor=3+Math.floor(sparkRandom(branchSeed+1)*(samples-7));
               var direction=sparkRandom(branchSeed+2)>.5?1:-1,fork=[];
-              var branchLength=5+Math.floor(sparkRandom(branchSeed+3)*10),reach=.35+sparkRandom(branchSeed+4)*2.1;
+              var branchLength=5+Math.floor(sparkRandom(branchSeed+3)*10),reach=.18+sparkRandom(branchSeed+4)*.65;
               var edgeA=points[branchAnchor-1],edgeB=points[branchAnchor+1];
               var edgeLength=Math.hypot(edgeB[0]-edgeA[0],edgeB[2]-edgeA[2])||1;
               var branchNx=-(edgeB[2]-edgeA[2])/edgeLength,branchNz=(edgeB[0]-edgeA[0])/edgeLength;
               for(var q=0;q<=branchLength;q++){
                 var u=q/branchLength,base=points[Math.min(samples,branchAnchor+Math.floor(u*4))];
-                var bend=direction*(u*u*reach+.06*Math.sin(u*13+branchSeed));
-                fork.push([base[0]+branchNx*bend,base[1]+u*(.08+reach*.25),base[2]+branchNz*bend]);
+                var bend=direction*(u*u*reach+.06*u*Math.sin(u*13+branchSeed));
+                fork.push([base[0]+branchNx*bend,base[1]+u*(.02+reach*.035),base[2]+branchNz*bend]);
               }
               var branchAdvance=smoothstep((advance-branchAnchor/samples)/(.15+sparkRandom(branchSeed+5)*.3));
               if(branchAdvance>0)dischargeStroke(partialPath3D(fork,branchAdvance),opacity*(.25+sparkRandom(branchSeed+6)*.4),lane,thickness*(.3+sparkRandom(branchSeed+7)*.4));
@@ -1334,7 +1334,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             var opacity=(.18+sparkRandom(seed+5)*.36)*(1-smoothstep((age-.65)/.35));
             if(opacity<.04||advance<=0)continue;
             var a=ribbonPoint(left,(anchor-left.routeStart)/left.routeStep),b=ribbonPoint(right,(anchor-right.routeStart)/right.routeStep),points=[];
-            var samples=8+Math.floor(sparkRandom(seed+6)*22),arch=.1+sparkRandom(seed+7)*1.1;
+            var samples=8+Math.floor(sparkRandom(seed+6)*22),arch=.04+sparkRandom(seed+7)*.2;
             for(var j=0;j<=samples;j++){
               var t=j/samples,envelope=Math.sin(t*Math.PI),jitter=(.02+sparkRandom(seed+8)*.1)*Math.sin(t*(27+samples*4)+seed);
               points.push([a[0]+(b[0]-a[0])*t+jitter,a[1]+(b[1]-a[1])*t+envelope*arch,a[2]+(b[2]-a[2])*t+jitter]);
