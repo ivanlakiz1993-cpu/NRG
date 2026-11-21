@@ -99,7 +99,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         [84,3,-185],[100,3,-185],[116,3,-185],[132,3,-185],[148,3,-185],
         [164,3,-185],[180,3,-185],[196,3,-185],[212,3,-185],[228,3,-185]
       ],36);      function at(i){i=Math.max(0,Math.min(route.length-1,i));var k=Math.floor(i),a=route[k],b=route[Math.min(k+1,route.length-1)];return a.map((v,j)=>v+(b[j]-v)*(i-k))}
-      var sceneStart=120;
+      var sceneStart=90;
       var originalRouteEnd=26*36;
       var routeDistances=[0];
       for(var distanceIndex=1;distanceIndex<route.length;distanceIndex++){
@@ -625,7 +625,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var distance=building.routeIndex===undefined?head[2]-building.z:building.routeIndex-currentRouteIndex;
         var stagger=building.side===1?3.2:0;
         var rise=smoothstep((38-distance-stagger)/17);
-        return rise;
+        return smoothstep(scrollProgress/.035)*rise;
       }
       function buildingLeave(building,ahead){
         if(building.final)return 1;
@@ -1203,21 +1203,24 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         return points;
       }
       function drawConductors(ribbons){
+        var reveal=smoothstep(scrollProgress/.025);
+        if(reveal<=0)return;
         var body=mixColor([120,120,120],[96,96,96],backgroundLightness);
         var bright=mixColor([200,200,200],[126,126,126],backgroundLightness);
         var dark=mixColor([68,68,68],[111,111,111],backgroundLightness);
         var outline=mixColor([74,74,74],[5,5,5],backgroundLightness);
         ribbons.forEach(function(line,lane){
-          strokePath3D(line,rgb(outline),.8,4.2);
-          strokePath3D(line,rgb(body),.9,2.35);
+          strokePath3D(line,rgb(outline),.8*reveal,4.2);
+          strokePath3D(line,rgb(body),.9*reveal,2.35);
           for(var strand=0;strand<3;strand++){
             var strandLine=wireStrand(line,lane,strand),isBright=(strand+lane)%3===0;
-            strokePath3D(strandLine,rgb(isBright?bright:dark),isBright?.52:.46,isBright?.62:.5);
+            strokePath3D(strandLine,rgb(isBright?bright:dark),(isBright?.52:.46)*reveal,isBright?.62:.5);
           }
-          strokePath3D(line,rgb(bright),.34,.42);
+          strokePath3D(line,rgb(bright),.34*reveal,.42);
         });
       }
       function dischargeStroke(points,opacity){
+        opacity*=smoothstep(scrollProgress/.025);
         if(opacity<.012)return;
         var halo=mixColor([82,139,255],[58,104,203],backgroundLightness);
         var plasma=mixColor([151,190,255],[90,133,218],backgroundLightness);
