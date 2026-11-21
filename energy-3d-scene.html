@@ -1274,28 +1274,33 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           for(var slot=Math.ceil((first+10-lane*7)/32);slot*32+lane*7<last-10;slot++){
             var anchorRoute=slot*32+lane*7,anchor=(anchorRoute-first)/stepSize;
             var clock=time*(1.05+lane*.13)+slot*.71+lane*.37;
-            var cycle=clock-Math.floor(clock),opacity=Math.pow(Math.sin(cycle*Math.PI),2)*.65;
-            if(opacity<.035)continue;
+            var cycle=clock-Math.floor(clock),advance=smoothstep(cycle/.68);
+            var opacity=(.38+.32*advance)*(1-smoothstep((cycle-.68)/.32));
+            if(opacity<.035||advance<=0)continue;
             var seed=slot*7.31+lane*4.17+Math.floor(clock)*3.29,points=[];
+            var shape=((slot+lane*2)%4+4)%4,span=[17,25,31,22][shape];
             for(var j=0;j<=30;j++){
-              var t=j/30,index=anchor+(t-.5)*24,p=ribbonPoint(line,index),a=ribbonPoint(line,index-1),b=ribbonPoint(line,index+1);
+              var t=j/30,index=anchor+(t-.5)*span,p=ribbonPoint(line,index),a=ribbonPoint(line,index-1),b=ribbonPoint(line,index+1);
               var length=Math.hypot(b[0]-a[0],b[2]-a[2])||1,nx=-(b[2]-a[2])/length,nz=(b[0]-a[0])/length;
               var envelope=Math.pow(Math.sin(t*Math.PI),.6);
               var jagged=.44*Math.sin(t*53+seed)+.25*Math.sin(t*117-seed)+.12*Math.sin(t*223+seed*.7);
-              var offset=envelope*.24*jagged;
+              var offset=envelope*.24*jagged+(shape===2?Math.sin(t*Math.PI*2)*.5:shape===3?envelope*.38:0);
               p[0]+=nx*offset;p[2]+=nz*offset;
-              p[1]+=envelope*(.1*Math.sin(t*47+seed)+.045*Math.sin(t*113-seed));points.push(p);
+              var arch=shape===1?.75:shape===2?.34:shape===3?.26:.08;
+              p[1]+=envelope*arch*(shape===3?.45+t:1)+envelope*(.1*Math.sin(t*47+seed)+.045*Math.sin(t*113-seed));points.push(p);
             }
-            dischargeStroke(points,opacity,lane);
-            for(var branch=0;branch<4;branch++){
-              var branchAnchor=4+(branch*6+slot*3)%20,direction=branch%2?1:-1,fork=[];
-              var branchLength=5+(branch*3+slot)%5;
+            if((slot+lane)%2)points.reverse();
+            dischargeStroke(partialPath3D(points,advance),opacity,lane);
+            for(var branch=0;branch<2+shape;branch++){
+              var branchAnchor=4+((branch*6+slot*3)%20+20)%20,direction=branch%2?1:-1,fork=[];
+              var branchLength=5+((branch*3+slot)%5+5)%5;
               for(var q=0;q<=branchLength;q++){
                 var u=q/branchLength,base=points[Math.min(30,branchAnchor+Math.floor(u*4))];
                 var flicker=Math.sin(u*8.4+seed+branch)*.07;
                 fork.push([base[0]+nx*direction*(u*u*(.12+(branch%4)*.055)+flicker),base[1]+u*(.08+(branch%3)*.045)+.035*Math.sin(u*12+seed+time*2.2),base[2]+nz*direction*(u*u*(.12+(branch%4)*.055)+flicker)]);
               }
-              dischargeStroke(fork,opacity*.28,lane);
+              var branchAdvance=smoothstep((advance-branchAnchor/30)/.27);
+              if(branchAdvance>0)dischargeStroke(partialPath3D(fork,branchAdvance),opacity*.3,lane);
             }
           }
         });
@@ -1305,14 +1310,16 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           var last=Math.min(left.routeStart+(left.length-1)*left.routeStep,right.routeStart+(right.length-1)*right.routeStep)-8;
           for(var slot=Math.ceil((first-lane*11)/96);slot*96+lane*11<last;slot++){
             var anchor=slot*96+lane*11,clock=time*.9+slot*.67+lane*.48;
-            var opacity=Math.pow(Math.sin((clock-Math.floor(clock))*Math.PI),4)*.32;
+            var cycle=clock-Math.floor(clock),advance=smoothstep(cycle/.62);
+            var opacity=.34*(1-smoothstep((cycle-.65)/.35));
             if(opacity<.04)continue;
             var a=ribbonPoint(left,(anchor-left.routeStart)/left.routeStep),b=ribbonPoint(right,(anchor-right.routeStart)/right.routeStep),points=[];
             for(var j=0;j<=14;j++){
               var t=j/14,envelope=Math.sin(t*Math.PI),jitter=.045*Math.sin(t*49+slot*7+lane);
-              points.push([a[0]+(b[0]-a[0])*t+jitter,a[1]+(b[1]-a[1])*t+envelope*.2,a[2]+(b[2]-a[2])*t+jitter]);
+              points.push([a[0]+(b[0]-a[0])*t+jitter,a[1]+(b[1]-a[1])*t+envelope*(slot%2?.55:.22),a[2]+(b[2]-a[2])*t+jitter]);
             }
-            dischargeStroke(points,opacity);
+            if(slot%2)points.reverse();
+            dischargeStroke(partialPath3D(points,advance),opacity);
           }
         }
       }
