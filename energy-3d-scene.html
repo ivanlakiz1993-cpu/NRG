@@ -1273,20 +1273,20 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         // Bursts are anchored to route positions: the cable moves past them, but sparks do not chase its tip.
         ribbons.forEach(function(line,lane){
           var stepSize=line.routeStep,first=line.routeStart,last=first+(line.length-1)*stepSize;
-          for(var slot=Math.ceil((first+10-lane*7)/32);slot*32+lane*7<last-10;slot++){
-            var anchorRoute=slot*32+lane*7,anchor=(anchorRoute-first)/stepSize;
-            var source=slot*19.31+lane*37.17,rate=.48+sparkRandom(source+1)*1.7;
+          for(var slot=Math.ceil((first+10-lane*7)/28);slot*28+lane*7<last-10;slot++){
+            var anchorRoute=slot*28+lane*7,anchor=(anchorRoute-first)/stepSize;
+            var source=slot*19.31+lane*37.17,rate=.4+sparkRandom(source+1)*.75;
             var clock=time*rate+sparkRandom(source+2),burst=Math.floor(clock),cycle=clock-burst;
-            var seed=source+burst*11.73,duty=.24+sparkRandom(seed+3)*.63;
+            var seed=source+burst*11.73,duty=.62+sparkRandom(seed+3)*.34;
             if(cycle>=duty)continue;
-            var age=cycle/duty,advance=smoothstep(age/(.38+sparkRandom(seed+4)*.42));
-            var opacity=(.28+sparkRandom(seed+5)*.52)*(1-smoothstep((age-.68)/.32));
+            var age=cycle/duty,advance=smoothstep(age/(.58+sparkRandom(seed+4)*.28));
+            var opacity=(.38+sparkRandom(seed+5)*.48)*(1-smoothstep((age-.78)/.22));
             if(opacity<.025||advance<=0)continue;
-            var span=Math.min(10+sparkRandom(seed+6)*48,2*Math.min(anchor,line.length-1-anchor)-2);
+            var span=Math.min(24+sparkRandom(seed+6)*72,2*Math.min(anchor,line.length-1-anchor)-2);
             if(span<6)continue;
-            var samples=12+Math.floor(sparkRandom(seed+7)*40),points=[];
+            var samples=25+Math.floor(sparkRandom(seed+7)*30),points=[];
             var arch=sparkRandom(seed+8)*1.05,side=(sparkRandom(seed+9)-.5)*1.25;
-            var roughness=.08+sparkRandom(seed+10)*.42,frequency=22+sparkRandom(seed+11)*125;
+            var roughness=.16+sparkRandom(seed+10)*.5,frequency=36+sparkRandom(seed+11)*130;
             var thickness=.52+sparkRandom(seed+12)*1.15;
             for(var j=0;j<=samples;j++){
               var t=j/samples,index=anchor+(t-.5)*span,p=ribbonPoint(line,index),a=ribbonPoint(line,index-1),b=ribbonPoint(line,index+1);
@@ -1298,12 +1298,14 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               p[1]+=envelope*(arch*(.5+t)+roughness*.18*Math.sin(t*frequency*1.4+seed));points.push(p);
             }
             if(sparkRandom(seed+13)>.5)points.reverse();
-            dischargeStroke(partialPath3D(points,advance),opacity,lane,thickness);
-            var branchCount=Math.floor(sparkRandom(seed+14)*8);
+            var grown=partialPath3D(points,advance);
+            dischargeStroke(grown,opacity*.58,lane,thickness);
+            dischargeStroke(grown.slice(-Math.max(3,Math.round(samples*.14))),opacity*.7,lane,thickness*.8);
+            var branchCount=3+Math.floor(sparkRandom(seed+14)*6);
             for(var branch=0;branch<branchCount;branch++){
               var branchSeed=seed+branch*5.81,branchAnchor=3+Math.floor(sparkRandom(branchSeed+1)*(samples-7));
               var direction=sparkRandom(branchSeed+2)>.5?1:-1,fork=[];
-              var branchLength=3+Math.floor(sparkRandom(branchSeed+3)*11),reach=.12+sparkRandom(branchSeed+4)*.95;
+              var branchLength=5+Math.floor(sparkRandom(branchSeed+3)*10),reach=.35+sparkRandom(branchSeed+4)*2.1;
               var edgeA=points[branchAnchor-1],edgeB=points[branchAnchor+1];
               var edgeLength=Math.hypot(edgeB[0]-edgeA[0],edgeB[2]-edgeA[2])||1;
               var branchNx=-(edgeB[2]-edgeA[2])/edgeLength,branchNz=(edgeB[0]-edgeA[0])/edgeLength;
@@ -1313,19 +1315,20 @@ function sampleCurve(controlPoints, samplesPerLeg) {
                 fork.push([base[0]+branchNx*bend,base[1]+u*(.08+reach*.25),base[2]+branchNz*bend]);
               }
               var branchAdvance=smoothstep((advance-branchAnchor/samples)/(.15+sparkRandom(branchSeed+5)*.3));
-              if(branchAdvance>0)dischargeStroke(partialPath3D(fork,branchAdvance),opacity*(.18+sparkRandom(branchSeed+6)*.35),lane,thickness*(.35+sparkRandom(branchSeed+7)*.45));
+              if(branchAdvance>0)dischargeStroke(partialPath3D(fork,branchAdvance),opacity*(.25+sparkRandom(branchSeed+6)*.4),lane,thickness*(.3+sparkRandom(branchSeed+7)*.4));
             }
           }
         });
-        // Cross-arcs also flash at fixed route locations instead of sliding along the conductors.
+        // Rare, brief cross-arcs connect the otherwise independent currents.
         for(var lane=0;lane<2;lane++){
           var left=ribbons[lane],right=ribbons[lane+1],first=Math.max(left.routeStart,right.routeStart)+8;
           var last=Math.min(left.routeStart+(left.length-1)*left.routeStep,right.routeStart+(right.length-1)*right.routeStep)-8;
-          for(var slot=Math.ceil((first-lane*11)/96);slot*96+lane*11<last;slot++){
-            var anchor=slot*96+lane*11,source=slot*31.9+lane*17.3;
+          for(var slot=Math.ceil((first-lane*11)/180);slot*180+lane*11<last;slot++){
+            var anchor=slot*180+lane*11,source=slot*31.9+lane*17.3;
             var clock=time*(.5+sparkRandom(source+1)*1.5)+sparkRandom(source+2);
             var burst=Math.floor(clock),cycle=clock-burst,seed=source+burst*9.7;
-            var duty=.2+sparkRandom(seed+3)*.65;
+            if(sparkRandom(seed+11)>.28)continue;
+            var duty=.12+sparkRandom(seed+3)*.22;
             if(cycle>=duty)continue;
             var age=cycle/duty,advance=smoothstep(age/(.3+sparkRandom(seed+4)*.5));
             var opacity=(.18+sparkRandom(seed+5)*.36)*(1-smoothstep((age-.65)/.35));
