@@ -1225,8 +1225,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var speeds=[.22,-.17,.2];
         ribbons.forEach(function(line,lane){
           if(line.length<2)return;
-          strokePath3D(line,'#3a83be',.28*reveal,1.2);
-          strokePath3D(line,'#9cd5f4',.15*reveal,.5);
+          strokePath3D(line,'#0054ce',.78*reveal,1.9);
+          strokePath3D(line,'#32baff',.9*reveal,1.05);
           var travel=reduceMotion?0:time*speeds[lane];
           for(var packet=0;packet<3;packet++){
             var phase=((travel+packet/3+lane*.17)%1+1)%1;
@@ -1238,12 +1238,12 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               var alpha=Math.sin((section+.5)/6*Math.PI)*reveal,path=[];
               for(var segment=section*4;segment<=section*4+4;segment++){
                 if(segment>section*4&&(start+span*segment/24)%(line.length-1)<(start+span*(segment-1)/24)%(line.length-1)){
-                  if(path.length>1){strokePath3D(path,'#3d8fd8',alpha*.38,1.8);strokePath3D(path,'#a8e5ff',alpha*.76,.8);}
+                  if(path.length>1){strokePath3D(path,'#168bff',alpha*.8,1.7);strokePath3D(path,'#b4f5ff',alpha*.95,.85);}
                   path=[];
                 }
                 path.push(points[segment]);
               }
-              if(path.length>1){strokePath3D(path,'#3d8fd8',alpha*.38,1.8);strokePath3D(path,'#a8e5ff',alpha*.76,.8);}
+              if(path.length>1){strokePath3D(path,'#168bff',alpha*.8,1.7);strokePath3D(path,'#b4f5ff',alpha*.95,.85);}
             }
           }
         });
