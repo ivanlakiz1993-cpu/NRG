@@ -1219,6 +1219,35 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           strokePath3D(line,rgb(bright),.34*reveal,.42);
         });
       }
+      function drawInnerCurrent(ribbons,time){
+        var reveal=smoothstep(scrollProgress/.025);
+        if(reveal<=0)return;
+        var speeds=[.22,-.17,.2];
+        ribbons.forEach(function(line,lane){
+          if(line.length<2)return;
+          strokePath3D(line,'#3a83be',.28*reveal,1.2);
+          strokePath3D(line,'#9cd5f4',.15*reveal,.5);
+          var travel=reduceMotion?0:time*speeds[lane];
+          for(var packet=0;packet<3;packet++){
+            var phase=((travel+packet/3+lane*.17)%1+1)%1;
+            var start=phase*(line.length-1),span=(line.length-1)*.3;
+            var points=[];
+            for(var step=0;step<=24;step++)points.push(ribbonPoint(line,(start+span*step/24)%(line.length-1)));
+            // Six softly graded sections keep the pulse inside the conductor without per-pixel work.
+            for(var section=0;section<6;section++){
+              var alpha=Math.sin((section+.5)/6*Math.PI)*reveal,path=[];
+              for(var segment=section*4;segment<=section*4+4;segment++){
+                if(segment>section*4&&(start+span*segment/24)%(line.length-1)<(start+span*(segment-1)/24)%(line.length-1)){
+                  if(path.length>1){strokePath3D(path,'#3d8fd8',alpha*.38,1.8);strokePath3D(path,'#a8e5ff',alpha*.76,.8);}
+                  path=[];
+                }
+                path.push(points[segment]);
+              }
+              if(path.length>1){strokePath3D(path,'#3d8fd8',alpha*.38,1.8);strokePath3D(path,'#a8e5ff',alpha*.76,.8);}
+            }
+          }
+        });
+      }
       function dischargeStroke(points,opacity){
         opacity*=smoothstep(scrollProgress/.025);
         if(opacity<.012)return;
@@ -1289,6 +1318,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         drawBackground();skyContext.drawImage(canvas,0,0);drawStreetscape(head);
         var ribbons=lanes.map(lane=>buildRibbon(i,lane));
         drawConductors(ribbons);
+        drawInnerCurrent(ribbons,performance.now()/1000);
         drawElectricity(ribbons,performance.now()/1000);
       }
       function render(time) { draw(time); }
