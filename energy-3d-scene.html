@@ -836,7 +836,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       function factoryPower(worldX,row){
         // The leading cable reaches the entrance at x=84 and the exit at x=184.
         // Spatial, deterministic sequencing also behaves correctly on reverse scrolling.
-        return smoothstep((at(currentRouteIndex)[0]-Math.max(84,worldX)-(row||0)*.65)/5);
+        return smoothstep((at(currentRouteIndex)[0]-Math.max(82,worldX-2)-(row||0)*.65)/5);
       }
       function detailAmount(grow,stage){
         stage=Math.min(stage,.94);
@@ -946,7 +946,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               var amount=smoothstep((grow-.5-pane.points[0][1]/roofHeight*.18)/.25);
               // Light a complete window row together so two mullioned halves never disagree.
               var paneX=pane.points.reduce((sum,p)=>sum+p[0]/pane.points.length,0);
-              var light=insideFactory?0:building.final?factoryPower(paneX,pane.row):smoothstep((building.z-head[2]-.07*pane.row)/1.2);
+              var light=insideFactory?0:building.final?factoryPower(paneX,pane.row):smoothstep((building.z-head[2]+1.8-.07*pane.row)/1.2);
               var brightness=windowLightAmount(pane,light,lightNow);
               if(brightness>0&&amount>.95){
                 var paneAlpha=brightness*smoothstep((amount-.95)/.05)*leave;
