@@ -716,7 +716,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         queue.sort((a,b)=>b.depth-a.depth);
         prepareFactoryDetails(finalFactory);
         var factoryGrow=drawingProgress(finalFactory,head);
-        var equipmentDepth=finalFactory.detailPanels.filter(p=>detailAmount(factoryGrow,p.stage)>.38).map(function(panel){
+        var equipmentDepth=finalFactory.detailPanels.filter(p=>detailAmount(factoryGrow,p.stage)>.01).map(function(panel){
           return {building:finalFactory,face:{points:panel.points},grow:1};
         });
         prepareDepth(queue.concat(equipmentDepth));
@@ -847,9 +847,9 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           function ring(x,y,z,r,stage){var points=[];for(var k=0;k<=48;k++){var angle=k/48*Math.PI*2;points.push([x+Math.cos(angle)*r,y,z+Math.sin(angle)*r]);}line(points,stage,.65);}
           building.powerBranches=[];
           // A continuous workshop shell: dark floor and inward-facing walls, with an open drive-through aisle.
-          panel([[-28.5,0,-.15],[21.5,0,-.15],[21.5,0,-99.85],[-28.5,0,-99.85]],.5,'#080c12');
-          panel([[-28.5,0,-3],[-28.5,19.8,-3],[-28.5,19.8,-97],[-28.5,0,-97]],.55,'#05080d');
-          panel([[21.5,0,-97],[21.5,19.8,-97],[21.5,19.8,-3],[21.5,0,-3]],.55,'#05080d');
+          panel([[-28.5,0,-.15],[21.5,0,-.15],[21.5,0,-99.85],[-28.5,0,-99.85]],.5,'#080808');
+          panel([[-28.5,0,-3],[-28.5,19.8,-3],[-28.5,19.8,-97],[-28.5,0,-97]],.55,'#0b0b0b');
+          panel([[21.5,0,-97],[21.5,19.8,-97],[21.5,19.8,-3],[21.5,0,-3]],.55,'#0b0b0b');
           for(var bayZ=-8;bayZ>=-96;bayZ-=12){
             for(var columnX of [-26.5,20]){
               frameBox(columnX-.22,columnX+.22,.1,19.7,bayZ+.22,bayZ-.22,.58,.85);
@@ -934,12 +934,19 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             line([[lampX-.38,fixtureY-.08,lampZ-2.45],[lampX+.38,fixtureY-.08,lampZ-2.45],[lampX+.38,fixtureY-.08,lampZ+2.45],[lampX-.38,fixtureY-.08,lampZ+2.45],[lampX-.38,fixtureY-.08,lampZ-2.45]],.72,.82);
             building.interiorLamps.push([84-lampZ,fixtureY-.08,-185+lampX]);
           }
-          function frameBox(x0,x1,y0,y1,z0,z1,stage,weight){
+          function frameBox(x0,x1,y0,y1,z0,z1,stage,weight,solid){
             var points=[[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],[x0,y0,z0],[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1],[x0,y0,z1]];
             line(points,stage,weight||.62);
             line([[x1,y0,z0],[x1,y0,z1]],stage,weight||.62);
             line([[x1,y1,z0],[x1,y1,z1]],stage,weight||.62);
             line([[x0,y1,z0],[x0,y1,z1]],stage,weight||.62);
+            if(solid){
+              panel([[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0]],stage,solid);
+              panel([[x1,y0,z1],[x0,y0,z1],[x0,y1,z1],[x1,y1,z1]],stage,solid);
+              panel([[x0,y0,z1],[x0,y0,z0],[x0,y1,z0],[x0,y1,z1]],stage,solid);
+              panel([[x1,y0,z0],[x1,y0,z1],[x1,y1,z1],[x1,y1,z0]],stage,solid);
+              panel([[x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1]],stage,solid);
+            }
           }
           function floorZone(left,right,front,back,stage){
             line([[left,.08,front],[right,.08,front],[right,.08,back],[left,.08,back],[left,.08,front]],stage,.48,.62);
@@ -947,11 +954,11 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           }
           function machineBay(left,right,front,back,height,stage){
             // Solid housings participate in depth: no far-side outlines visible through a machine.
-            panel([[left,.15,front],[right,.15,front],[right,height,front],[left,height,front]],stage,'#111923');
-            panel([[left,.15,back],[right,.15,back],[right,height,back],[left,height,back]],stage,'#10161e');
-            panel([[left,.15,front],[left,.15,back],[left,height,back],[left,height,front]],stage,'#0d141e');
-            panel([[right,.15,front],[right,.15,back],[right,height,back],[right,height,front]],stage,'#141c26');
-            panel([[left,height,front],[right,height,front],[right,height,back],[left,height,back]],stage,'#1b2430');
+            panel([[left,.15,front],[right,.15,front],[right,height,front],[left,height,front]],stage,'#1c1c1c');
+            panel([[left,.15,back],[right,.15,back],[right,height,back],[left,height,back]],stage,'#161616');
+            panel([[left,.15,front],[left,.15,back],[left,height,back],[left,height,front]],stage,'#111111');
+            panel([[right,.15,front],[right,.15,back],[right,height,back],[right,height,front]],stage,'#171717');
+            panel([[left,height,front],[right,height,front],[right,height,back],[left,height,back]],stage,'#222222');
             frameBox(left,right,.15,height,front,back,stage,.82);
             panel([[left+.28,.45,front+.035],[right-.28,.45,front+.035],[right-.28,height-.35,front+.035],[left+.28,height-.35,front+.035]],stage,"rgb(24,24,24)");
             var glassTop=height-1.05,glassBottom=Math.max(2.1,height*.48);
@@ -979,35 +986,35 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           machineBay(-23,-16,-31,-46,7.2,.73);
           machineBay(14,20,-73,-90,6.6,.91);
           // CNC machining center: enclosed work area, tool head, table and operator panel.
-          frameBox(-16,-8,.2,5.4,-13,-24,.83,.9);
-          frameBox(-15.2,-8.8,1,4.8,-13.15,-13.45,.9,.6);
+          frameBox(-16,-8,.2,5.4,-13,-24,.83,.9,'#1b1b1b');
+          frameBox(-15.2,-8.8,1,4.8,-13.15,-13.45,.9,.6,'#292929');
           line([[-15.1,3.15,-13.2],[-8.9,3.15,-13.2],[-8.9,4.55,-13.2],[-15.1,4.55,-13.2],[-15.1,3.15,-13.2]],.92,.68);
           line([[-12,3.2,-13.22],[-12,4.5,-13.22]],.93,.38);
           line([[-15.4,1.5,-24.1],[-8.6,1.5,-24.1],[-8.6,2,-23.3],[-15.4,2,-23.3],[-15.4,1.5,-24.1]],.92,.8);
           line([[-12,4.75,-14],[-12,3.6,-14],[-11.5,3.6,-14]],.95,.78);
-          frameBox(-7.2,-6.4,1.1,3.7,-15,-17,.96,.75);
+          frameBox(-7.2,-6.4,1.1,3.7,-15,-17,.96,.75,'#242424');
           line([[-6.4,3.15,-15.08],[-6.4,2.3,-15.08]],.98,.7);
           for(var controlButton=0;controlButton<4;controlButton++)ring(-6.35,2.95-controlButton*.32,-16,.075,.99);
           // Hydraulic press with a wide bed, twin columns, ram and safety cage.
-          frameBox(8,18,.15,1.7,-34,-46,.86,.85);
-          for(var pressX of [9.2,16.8])frameBox(pressX-.38,pressX+.38,1.7,9.8,-35,-36,.88,.82);
-          frameBox(8.5,17.5,9.2,10.2,-35.2,-36.2,.9,.9);
-          frameBox(10.2,15.8,3.4,7.7,-35.4,-38,.94,.72);
-          frameBox(9,17,2.3,3.1,-37,-42,.96,.72);
+          frameBox(8,18,.15,1.7,-34,-46,.86,.85,'#202020');
+          for(var pressX of [9.2,16.8])frameBox(pressX-.38,pressX+.38,1.7,9.8,-35,-36,.88,.82,'#272727');
+          frameBox(8.5,17.5,9.2,10.2,-35.2,-36.2,.9,.9,'#252525');
+          frameBox(10.2,15.8,3.4,7.7,-35.4,-38,.94,.72,'#191919');
+          frameBox(9,17,2.3,3.1,-37,-42,.96,.72,'#2a2a2a');
           line([[8.2,.35,-34.5],[18,.35,-34.5]],.96,.65);
-          frameBox(18.7,20.8,2,5.7,-36,-38,.98,.62);
+          frameBox(18.7,20.8,2,5.7,-36,-38,.98,.62,'#202020');
           line([[19,5.2,-36.05],[20.4,5.2,-36.05]],.99,.55);
           for(var guardZ of [-34.5,-45.5]){
             line([[7.6,.1,guardZ],[7.6,4.8,guardZ],[8.3,4.8,guardZ]],.92,.54);
             line([[18.4,.1,guardZ],[18.4,4.8,guardZ],[17.7,4.8,guardZ]],.92,.54);
           }
           // Roller conveyor, motor housings and guarded transfer section, outside the cable lane.
-          frameBox(8.2,17.6,.55,1.35,-52,-70,.88,.64);
+          frameBox(8.2,17.6,.55,1.35,-52,-70,.88,.64,'#1a1a1a');
           for(var rollerZ=-53;rollerZ>=-69;rollerZ-=1.25){
             line([[8.05,1.3,rollerZ],[17.75,1.3,rollerZ]],.9,.48);
             line([[8.1,.35,rollerZ],[17.7,.35,rollerZ]],.9,.4);
           }
-          frameBox(15.4,17.1,1.35,2.55,-56,-58,.94,.56);
+          frameBox(15.4,17.1,1.35,2.55,-56,-58,.94,.56,'#252525');
           ring(16.25,1.9,-57,.42,.95);
           // Two clearly recognizable manual pallet trucks parked outside the clear aisle.
           function palletJack(cx,cz,stage){
@@ -1017,18 +1024,18 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             for(var wheelX of [cx-.62,cx+.62]){
               var wheel=[];for(var k=0;k<=16;k++){var a=k/16*Math.PI*2;wheel.push([wheelX+Math.cos(a)*.24,.28+Math.sin(a)*.24,cz-.25]);}line(wheel,stage,.68);
             }
-            frameBox(cx-1.25,cx+1.25,.15,1.8,cz-1.1,cz-2.35,stage,.5);
+            frameBox(cx-1.25,cx+1.25,.15,1.8,cz-1.1,cz-2.35,stage,.5,'#202020');
             line([[cx-1.12,.28,cz-1.2],[cx+1.12,.28,cz-1.2]],stage,.42);
           }
           palletJack(-9,-67,.94);palletJack(10,-79,.96);
           // Electrical cabinets, pump skid and a smaller lathe form a second recognizable bay.
           for(var cabinet=0;cabinet<4;cabinet++){
             var cabX=19.2+cabinet*1.15,cabZ=-58-cabinet%2*2;
-            frameBox(cabX,cabX+.85,.2,4.2,cabZ,cabZ-1.5,.91,.58);
+            frameBox(cabX,cabX+.85,.2,4.2,cabZ,cabZ-1.5,.91,.58,'#222222');
             line([[cabX+.12,3.35,cabZ-.03],[cabX+.68,3.35,cabZ-.03]],.98,.45);
             for(var button=0;button<3;button++)ring(cabX+.3+button*.17,2.9,cabZ-.04,.055,.99);
           }
-          frameBox(-17,-9,.2,2.6,-49,-61,.89,.64);
+          frameBox(-17,-9,.2,2.6,-49,-61,.89,.64,'#202020');
           function spindleRing(x,y,z,r,stage){var circle=[];for(var k=0;k<=32;k++){var angle=k/32*Math.PI*2;circle.push([x+Math.cos(angle)*r,y+Math.sin(angle)*r,z]);}line(circle,stage,.7);}
           for(var latheZ of [-50.5,-59.5])spindleRing(-13,1.4,latheZ,.72,.93);
           for(var latheAngle=0;latheAngle<8;latheAngle++){
@@ -1037,8 +1044,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           }
           spindleRing(-13,1.4,-50.35,.88,.94);
           line([[-16,2.2,-52],[-10,2.2,-52],[-10,2.2,-58],[-16,2.2,-58]],.94,.58);
-          frameBox(-16,-9,.2,2.1,-77,-86,.93,.62);
-          frameBox(-15.5,-9.5,2.1,3.2,-79,-84,.95,.58);
+          frameBox(-16,-9,.2,2.1,-77,-86,.93,.62,'#1e1e1e');
+          frameBox(-15.5,-9.5,2.1,3.2,-79,-84,.95,.58,'#282828');
           // Rounded vessel hoops, access ladders and roof safety railings.
           for(var tank=0;tank<2;tank++){
             var x=39+tank*9,top=11+tank*2;
@@ -1129,8 +1136,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var grow=drawingProgress(building,head);if(grow<=0)return;
         building.detailPanels.forEach(function(item){
           var amount=detailAmount(grow,item.stage);
-          // Every solid is pure black; only contour lines, light and electricity carry colour.
-          if(amount>.01)fillSurface3D(item.points,'#000',amount);
+          // Subtle opaque shading separates the equipment from the black background.
+          if(amount>.01)fillSurface3D(item.points,item.color,amount);
         });
         building.detailPaths.forEach(function(path){
           var points=partialPath3D(path.points,detailAmount(grow,path.stage));
