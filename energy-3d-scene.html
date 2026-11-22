@@ -632,20 +632,24 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       function damFaceX(z,y){return 349+.0013*(z+185)*(z+185)+11*y/56;}
       function damFront(z,y,offset){return [damFaceX(z,y)-(offset||0),y,z];}
       hydroPanel([[186,.03,-220],[347,.03,-220],[347,.03,-150],[186,.03,-150]],'#111111');
+      var bankShelfLevels=[5,6.4,6.2,7.8,7.1,8.5,8.2,9.4,10.2];
+      var bankRidgeLevels=[24,28,26,33,29,36,33,39,41];
       for(var bank of [-1,1]){
         var edgeZ=bank<0?-220:-150,shelfZ=bank<0?-226:-144,outerZ=bank<0?-239:-131;
         for(var reach=0;reach<8;reach++){
-          var ax=190+reach*20,bx=ax+20;
-          var shelfHeight=5+(reach%3)*1.4,ridgeHeight=24+(reach*7%5)*2.8;
-          hydroPanel([[ax,0,edgeZ],[bx,0,edgeZ],[bx,shelfHeight,shelfZ],[ax,shelfHeight,shelfZ]],reach%2?'#171717':'#1d1d1d');
-          hydroPanel([[ax,shelfHeight,shelfZ],[bx,shelfHeight,shelfZ],[bx,ridgeHeight,outerZ],[ax,ridgeHeight+2,outerZ]],reach%2?'#202020':'#272727');
-          hydroPanel([[ax,ridgeHeight+2,outerZ],[bx,ridgeHeight,outerZ],[bx,ridgeHeight+5,outerZ+bank*23],[ax,ridgeHeight+8,outerZ+bank*23]],'#141414');
+          var ax=190+reach*20,bx=reach===7?346:ax+20;
+          var shelfA=bankShelfLevels[reach]+(bank>0?1:0),shelfB=bankShelfLevels[reach+1]+(bank>0?1:0);
+          var ridgeA=bankRidgeLevels[reach]+(bank>0?2:0),ridgeB=bankRidgeLevels[reach+1]+(bank>0?2:0);
+          hydroPanel([[ax,0,edgeZ],[bx,0,edgeZ],[bx,shelfB,shelfZ],[ax,shelfA,shelfZ]],reach%2?'#171717':'#1d1d1d');
+          hydroPanel([[ax,shelfA,shelfZ],[bx,shelfB,shelfZ],[bx,ridgeB,outerZ],[ax,ridgeA,outerZ]],reach%2?'#202020':'#272727');
+          hydroPanel([[ax,ridgeA,outerZ],[bx,ridgeB,outerZ],[bx,ridgeB+6,outerZ+bank*23],[ax,ridgeA+6,outerZ+bank*23]],'#141414');
           hydroLine([[ax,0,edgeZ],[ax+10,.18,edgeZ+bank*1.5],[bx,0,edgeZ]],1.1,.85);
-          hydroLine([[ax,shelfHeight,shelfZ],[ax+10,shelfHeight+.8,shelfZ],[bx,shelfHeight,shelfZ]],.7,.58);
-          hydroLine([[ax,ridgeHeight+2,outerZ],[ax+8,ridgeHeight+4,outerZ+bank*4],[bx,ridgeHeight,outerZ]],1,.74);
-          hydroLine([[ax+3,shelfHeight,shelfZ],[ax+9,ridgeHeight*.65,(shelfZ+outerZ)*.5],[bx-2,ridgeHeight,outerZ]],.55,.42);
+          hydroLine([[ax,shelfA,shelfZ],[ax+10,(shelfA+shelfB)*.5+.8,shelfZ],[bx,shelfB,shelfZ]],.7,.58);
+          hydroLine([[ax,ridgeA,outerZ],[ax+8,(ridgeA+ridgeB)*.5+2,outerZ+bank*4],[bx,ridgeB,outerZ]],1,.74);
+          hydroLine([[ax+3,shelfA,shelfZ],[ax+9,(ridgeA+ridgeB)*.32,(shelfZ+outerZ)*.5],[bx-2,ridgeB,outerZ]],.55,.42);
         }
       }
+      var bankPanelEnd=hydroPanels.length,bankPathEnd=hydroPaths.length;
       var damCrest=[];
       for(var section=0;section<20;section++){
         var z0=-315+section*13,z1=z0+13;
@@ -718,12 +722,18 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       function drawHydroScene(head){
         var reveal=smoothstep((head[0]-188)/72);
         if(reveal<=0)return;
-        hydroPanels.forEach(p=>fillSurface3D(p.points,p.color,reveal));
-        drawMovingWater(reveal);
-        hydroPaths.forEach(p=>{
+        function drawPaths(first,last){for(var index=first;index<last;index++){
+          var p=hydroPaths[index];
           strokePath3D(p.points,rgb(contourHalo),reveal*p.alpha*.15,p.weight+1);
           strokePath3D(p.points,rgb(contourBase),reveal*p.alpha,p.weight);
-        });
+        }}
+        // Paint the dam first, then the nearer cliffs over it so no far outlines leak through rock.
+        for(var panel=bankPanelEnd;panel<hydroPanels.length;panel++)fillSurface3D(hydroPanels[panel].points,hydroPanels[panel].color,reveal);
+        drawPaths(bankPathEnd,hydroPaths.length);
+        for(var panel=1;panel<bankPanelEnd;panel++)fillSurface3D(hydroPanels[panel].points,hydroPanels[panel].color,reveal);
+        drawPaths(0,bankPathEnd);
+        fillSurface3D(hydroPanels[0].points,hydroPanels[0].color,reveal);
+        drawMovingWater(reveal);
       }
       function drawingProgress(building,head){
         if(building.final)return smoothstep((currentRouteIndex-originalRouteEnd+25)/150);
