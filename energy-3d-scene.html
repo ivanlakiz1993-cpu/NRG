@@ -392,6 +392,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       }
       // Continuous streetscape: staggered architecture frames both sides of the journey.
       var streetscape=[];
+      var windowLightColors=[[255,228,158],[255,246,224],[212,163,89],[168,209,255]];
+      function windowRandom(value){var n=Math.sin(value*127.1+78.233)*43758.5453;return n-Math.floor(n)}
       function routeCenter(z){
         var nearest=route[0];
         for(var j=1;j<=originalRouteEnd;j++)if(Math.abs(route[j][2]-z)<Math.abs(nearest[2]-z))nearest=route[j];
@@ -434,7 +436,13 @@ function sampleCurve(controlPoints, samplesPerLeg) {
                 if(building.final&&wy<6.5)continue;
                 var ax=bottom[i][0]+(bottom[j][0]-bottom[i][0])*t0,az=bottom[i][2]+(bottom[j][2]-bottom[i][2])*t0;
                 var bx=bottom[i][0]+(bottom[j][0]-bottom[i][0])*t1,bz=bottom[i][2]+(bottom[j][2]-bottom[i][2])*t1;
-                windows.push({points:[[ax,wy,az],[bx,wy,bz],[bx,wy+wh,bz],[ax,wy+wh,az]],row:row,col:col,style:windowStyle});
+                var lightSeed=building.seed*31+i*17+row*7.3+col*1.9;
+                var shade=windowRandom(lightSeed),choice=shade<.42?0:shade<.72?1:shade<.9?2:3;
+                windows.push({points:[[ax,wy,az],[bx,wy,bz],[bx,wy+wh,bz],[ax,wy+wh,az]],row:row,col:col,style:windowStyle,
+                  lightColor:windowLightColors[choice],lightOpacity:.52+windowRandom(lightSeed+3.1)*.4,
+                  lightDelay:.1+windowRandom(lightSeed+8.7)*1.4,
+                  lightOn:building.final||windowRandom(lightSeed+12.4)>.19,
+                  lightFlicker:false,lightOnset:-1});
               }
             }
             var isFactoryPortal=building.final&&detail&&y0<.1&&span>35&&Math.max(...tops)>15&&Math.abs(bottom[i][2]-bottom[j][2])<.001&&(Math.abs(bottom[i][2]-z)<.08||Math.abs(bottom[i][2]-(z-100))<.08);
@@ -607,6 +615,11 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           roundBox(-w*.64,w*.64,0,h*.43,0,-d,Math.min(d*.44,w*.35),true);
           roundBox(-w*.58,w*.16,h*.43,h*.86,-d*.15,-d+.4,Math.min(d*.32,w*.26),true);
           roundBox(-w*.7,w*.69,1.35,1.6,.45,-1.8,.95,false);
+        }
+        var litPanes=faces.flatMap(face=>face.windows).filter(pane=>pane.lightOn);
+        if(litPanes.length){
+          litPanes[Math.floor(litPanes.length*.23)].lightFlicker=true;
+          if(litPanes.length>4&&building.variant%3===0)litPanes[Math.floor(litPanes.length*.71)].lightFlicker=true;
         }
         return faces;
       }
@@ -832,8 +845,50 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var centre=points.reduce((sum,p)=>sum.map((v,i)=>v+p[i]/points.length),[0,0,0]);
         return points.concat([centre]).every(function(p){var q=projectInto(...p,{});return q.visible&&visibleAt(q.x,q.y,1/q.depth);});
       }
+      function windowLightAmount(pane,power,now){
+        if(!pane.lightOn||power<.75){pane.lightOnset=-1;return 0;}
+        if(power<.88)return 0;
+        if(pane.lightOnset<0)pane.lightOnset=now;
+        var elapsed=(now-pane.lightOnset)/1000-pane.lightDelay;
+        if(reduceMotion)return pane.lightOpacity;
+        if(elapsed<=0)return 0;
+        if(pane.lightFlicker){
+          if(elapsed<.055)return pane.lightOpacity*.9;
+          if(elapsed<.115)return pane.lightOpacity*.13;
+          if(elapsed<.165)return pane.lightOpacity*.8;
+          if(elapsed<.23)return pane.lightOpacity*.2;
+          return pane.lightOpacity;
+        }
+        return pane.lightOpacity*smoothstep(elapsed/(.05+.05*windowRandom(pane.lightDelay)));
+      }
+      function drawWindowLight(points,color,alpha,depthClipped){
+        var projected=points.map(p=>projectInto(...p,{}));
+        if(projected.some(p=>!p.visible))return;
+        var xs=projected.map(p=>p.x),ys=projected.map(p=>p.y);
+        var left=Math.min(...xs),right=Math.max(...xs),top=Math.min(...ys),bottom=Math.max(...ys);
+        var radius=Math.max(2,Math.hypot(right-left,bottom-top)*.59);
+        var cx=(left+right)*.5,cy=top+(bottom-top)*.38;
+        var gradient=ctx.createRadialGradient(cx,cy,0,cx,cy,radius);
+        gradient.addColorStop(0,rgb(mixColor(color,[255,255,255],.26)));
+        gradient.addColorStop(.5,rgb(color));
+        gradient.addColorStop(1,rgb(mixColor(color,[20,22,28],.24)));
+        ctx.save();
+        ctx.shadowColor=rgb(color,.42);
+        ctx.shadowBlur=Math.min(14,Math.max(3,(right-left)*.13));
+        if(depthClipped)fillSurface3D(points,gradient,alpha);
+        else fillPolygon3D(points,gradient,null,alpha);
+        ctx.restore();
+        // A small lit sill gives the opening depth without a heavy window frame.
+        strokePath3D([points[0],points[1]],rgb(mixColor(color,[255,255,255],.48)),alpha*.48,1.05);
+        if(depthClipped&&right-left>12){
+          ctx.save();ctx.shadowColor=rgb(color,.35);ctx.shadowBlur=9;
+          strokePath3D(points.concat([points[0]]),rgb(color),alpha*.12,1.5);
+          ctx.restore();
+        }
+      }
       function drawStreetscape(head){
         var time=reduceMotion?0:performance.now()*.00035;
+        var lightNow=performance.now();
         var insideFactory=cameraX>84&&cameraX<184&&cameraZ>-214&&cameraZ<-163;
         var queue=[],active=[],factoryWindows=[];
         function faceDepth(face){return (face.mid[0]-cameraX)*cameraForward[0]+(face.mid[1]-cameraY)*cameraForward[1]+(face.mid[2]-cameraZ)*cameraForward[2]}
@@ -868,13 +923,11 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               // Light a complete window row together so two mullioned halves never disagree.
               var paneX=pane.points.reduce((sum,p)=>sum+p[0]/pane.points.length,0);
               var light=insideFactory?0:building.final?factoryPower(paneX,pane.row):smoothstep((building.z-head[2]-.07*pane.row)/1.2);
-              if(light>0&&amount>.95){
-                // Interior lamps keep a soft warm-white tone, independent of contour polarity.
-                var lamp=mixColor([255,218,157],[239,185,112],backgroundLightness);
-                var roomBrightness=.76;
-                var paneFill={points:pane.points,face:face.points,color:rgb(lamp,light*roomBrightness),alpha:smoothstep((amount-.95)/.05)*leave};
-                if(building.final)factoryWindows.push(paneFill);
-                else if(windowVisible(pane.points))fillPolygon3D(paneFill.points,paneFill.color,null,paneFill.alpha);
+              var brightness=windowLightAmount(pane,light,lightNow);
+              if(brightness>0&&amount>.95){
+                var paneAlpha=brightness*smoothstep((amount-.95)/.05)*leave;
+                if(building.final)factoryWindows.push({points:pane.points,color:pane.lightColor,alpha:paneAlpha});
+                else if(windowVisible(pane.points))drawWindowLight(pane.points,pane.lightColor,paneAlpha,false);
               }
             });return;}
             // A travelling, continuous light band sweeps across the complete facade.
@@ -931,7 +984,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         });
         // Glazing is clipped at construction, then depth-tested per visible pixel.
         factoryWindows.forEach(function(pane){
-          fillSurface3D(pane.points,pane.color,pane.alpha);
+          drawWindowLight(pane.points,pane.color,pane.alpha,true);
           strokePath3D(pane.points.concat([pane.points[0]]),rgb(contourBase),.85,.7);
           var p=pane.points,mid=(a,b)=>a.map((v,i)=>(v+b[i])*.5);
           strokePath3D([mid(p[0],p[1]),mid(p[3],p[2])],rgb(contourBase),.65,.65);
