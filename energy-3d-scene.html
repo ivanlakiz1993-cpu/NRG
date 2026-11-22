@@ -1192,44 +1192,34 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         index=Math.max(0,Math.min(line.length-1,index));var n=Math.floor(index),t=index-n,a=line[n],b=line[Math.min(n+1,line.length-1)];
         return a.map((v,j)=>v+(b[j]-v)*t);
       }
-      function wireStrand(line,lane,strand){
-        var points=[],phase=strand*Math.PI*2/3+lane*.71;
-        for(var i=0;i<line.length;i++){
-          var p=line[i],a=line[Math.max(0,i-1)],b=line[Math.min(line.length-1,i+1)];
-          var length=Math.hypot(b[0]-a[0],b[2]-a[2])||1,nx=-(b[2]-a[2])/length,nz=(b[0]-a[0])/length;
-          var angle=i*.19+phase,side=Math.cos(angle)*.035,up=Math.sin(angle)*.035;
-          points.push([p[0]+nx*side,p[1]+up,p[2]+nz*side]);
-        }
-        return points;
-      }
-      function drawConductors(ribbons){
-        var reveal=smoothstep(scrollProgress/.025);
-        if(reveal<=0)return;
-        var body=mixColor([120,120,120],[96,96,96],backgroundLightness);
-        var bright=mixColor([200,200,200],[126,126,126],backgroundLightness);
-        var dark=mixColor([68,68,68],[111,111,111],backgroundLightness);
-        var outline=mixColor([74,74,74],[5,5,5],backgroundLightness);
-        ribbons.forEach(function(line,lane){
-          strokePath3D(line,rgb(outline),.8*reveal,4.2);
-          strokePath3D(line,rgb(body),.9*reveal,2.35);
-          for(var strand=0;strand<3;strand++){
-            var strandLine=wireStrand(line,lane,strand),isBright=(strand+lane)%3===0;
-            strokePath3D(strandLine,rgb(isBright?bright:dark),(isBright?.52:.46)*reveal,isBright?.62:.5);
-          }
-          strokePath3D(line,rgb(bright),.34*reveal,.42);
-        });
-      }
       var wireColors=[[0,117,190],[40,53,130],[118,183,42]];
       function drawInnerCurrent(ribbons,time){
         var reveal=smoothstep(scrollProgress/.025);
         if(reveal<=0)return;
-        var speeds=[.22,-.17,.2];
+        var speeds=[.22,.19,.2];
         ribbons.forEach(function(line,lane){
           if(line.length<2)return;
-          var color=wireColors[lane],highlight=mixColor(color,[255,255,255],.45);
-          var breath=reduceMotion?.78:.72+.16*Math.sin(time*(1.5+lane*.2)+lane*1.7);
-          strokePath3D(line,rgb(color),breath*reveal,1.9);
-          strokePath3D(line,rgb(highlight),breath*reveal,1.05);
+          var color=wireColors[lane],highlight=mixColor(color,[255,255,255],.55);
+          var ropeWidth=width<700?7.5:10.5;
+          var breath=reduceMotion?.8:.78+.12*Math.sin(time*(1.5+lane*.2)+lane*1.7);
+          // The visible path is energy itself: a continuous coloured body with moving inner strands.
+          strokePath3D(line,rgb(mixColor(color,[0,0,0],.3)),reveal,ropeWidth+2);
+          strokePath3D(line,rgb(color),reveal,ropeWidth);
+          strokePath3D(line,rgb(highlight),breath*reveal,ropeWidth*.46);
+          // Five phase-shifted filaments coil around the body, flowing at different rates.
+          for(var filament=0;filament<5;filament++){
+            var strandPath=[],phase=filament*Math.PI*2/5;
+            for(var sample=0;sample<line.length;sample+=2){
+              var point=line[sample],before=line[Math.max(0,sample-2)],after=line[Math.min(line.length-1,sample+2)];
+              var length=Math.hypot(after[0]-before[0],after[2]-before[2])||1;
+              var nx=-(after[2]-before[2])/length,nz=(after[0]-before[0])/length;
+              var wave=(line.routeStart+sample*line.routeStep)*.32-time*(reduceMotion?0:3.2+lane*.45)+phase;
+              var side=Math.cos(wave)*.11,up=Math.sin(wave)*.045;
+              strandPath.push([point[0]+nx*side,point[1]+up,point[2]+nz*side]);
+            }
+            if((line.length-1)%2)strandPath.push(line[line.length-1]);
+            strokePath3D(strandPath,rgb(mixColor(color,[255,255,255],.32+filament*.1)),(.48+filament*.06)*reveal,1.4);
+          }
           var travel=reduceMotion?0:time*speeds[lane];
           for(var packet=0;packet<3;packet++){
             var phase=((travel+packet/3+lane*.17)%1+1)%1;
@@ -1241,106 +1231,59 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               var alpha=Math.sin((section+.5)/6*Math.PI)*reveal,path=[];
               for(var segment=section*4;segment<=section*4+4;segment++){
                 if(segment>section*4&&(start+span*segment/24)%(line.length-1)<(start+span*(segment-1)/24)%(line.length-1)){
-                  if(path.length>1){strokePath3D(path,rgb(color),alpha*.9,1.7);strokePath3D(path,rgb(highlight),alpha*.98,.85);}
+                  if(path.length>1){strokePath3D(path,rgb(color),alpha*.9,ropeWidth*.65);strokePath3D(path,rgb(highlight),alpha*.98,ropeWidth*.3);}
                   path=[];
                 }
                 path.push(points[segment]);
               }
-              if(path.length>1){strokePath3D(path,rgb(color),alpha*.9,1.7);strokePath3D(path,rgb(highlight),alpha*.98,.85);}
+              if(path.length>1){strokePath3D(path,rgb(color),alpha*.9,ropeWidth*.65);strokePath3D(path,rgb(highlight),alpha*.98,ropeWidth*.3);}
             }
           }
-        });
-      }
-      function dischargeStroke(points,opacity,lane,thickness){
-        opacity*=smoothstep(scrollProgress/.025);
-        if(opacity<.012)return;
-        thickness=thickness||1;
-        var base=lane===undefined?[100,152,224]:wireColors[lane];
-        var halo=mixColor(base,[255,255,255],.15);
-        var plasma=mixColor(base,[255,255,255],.5);
-        var core=mixColor(base,[255,255,255],.86);
-        ctx.save();ctx.globalCompositeOperation="lighter";
-        strokePath3D(points,rgb(halo),opacity*.095,27*thickness);
-        strokePath3D(points,rgb(halo),opacity*.16,13.5*thickness);
-        strokePath3D(points,rgb(plasma),opacity*.39,5*thickness);
-        strokePath3D(points,rgb(core),opacity*.8,1.6*thickness);
-        strokePath3D(points,rgb(core),opacity*.68,.58*thickness);
-        ctx.restore();
-      }
-      function sparkRandom(seed){var value=Math.sin(seed*12.9898)*43758.5453;return value-Math.floor(value);}
-      function drawElectricity(ribbons,time){
-        if(reduceMotion)return;
-        // Bursts are anchored to route positions: the cable moves past them, but sparks do not chase its tip.
-        ribbons.forEach(function(line,lane){
-          var stepSize=line.routeStep,first=line.routeStart,last=first+(line.length-1)*stepSize;
-          for(var slot=Math.ceil((first+10-lane*7)/28);slot*28+lane*7<last-10;slot++){
-            var anchorRoute=slot*28+lane*7,anchor=(anchorRoute-first)/stepSize;
-            var source=slot*19.31+lane*37.17,rate=.4+sparkRandom(source+1)*.75;
-            var clock=time*rate+sparkRandom(source+2),burst=Math.floor(clock),cycle=clock-burst;
-            var seed=source+burst*11.73,duty=.62+sparkRandom(seed+3)*.34;
-            if(cycle>=duty)continue;
-            var age=cycle/duty,advance=smoothstep(age/(.58+sparkRandom(seed+4)*.28));
-            var opacity=(.38+sparkRandom(seed+5)*.48)*(1-smoothstep((age-.78)/.22));
-            if(opacity<.025||advance<=0)continue;
-            var span=Math.min(24+sparkRandom(seed+6)*72,2*Math.min(anchor,line.length-1-anchor)-2);
-            if(span<6)continue;
-            var samples=25+Math.floor(sparkRandom(seed+7)*30),points=[];
-            var arch=.03+sparkRandom(seed+8)*.2,side=(sparkRandom(seed+9)-.5)*.75;
-            var roughness=.1+sparkRandom(seed+10)*.26,frequency=36+sparkRandom(seed+11)*130;
-            var thickness=.52+sparkRandom(seed+12)*1.15;
-            for(var j=0;j<=samples;j++){
-              var t=j/samples,index=anchor+(t-.5)*span,p=ribbonPoint(line,index),a=ribbonPoint(line,index-1),b=ribbonPoint(line,index+1);
-              var length=Math.hypot(b[0]-a[0],b[2]-a[2])||1,nx=-(b[2]-a[2])/length,nz=(b[0]-a[0])/length;
-              var envelope=Math.pow(Math.sin(t*Math.PI),.6);
-              var jagged=Math.sin(t*frequency+seed)+.5*Math.sin(t*frequency*2.3-seed);
-              var offset=envelope*(side*Math.sin(t*Math.PI*2)+roughness*jagged);
-              p[0]+=nx*offset;p[2]+=nz*offset;
-              p[1]+=envelope*(arch*(.5+t)+roughness*.05*Math.sin(t*frequency*1.4+seed));points.push(p);
+          // Short electric bridges stay inside the coloured rope and connect its moving filaments.
+          var first=line.routeStart,last=first+(line.length-1)*line.routeStep;
+          ctx.save();ctx.globalCompositeOperation='lighter';ctx.lineCap='round';ctx.lineJoin='round';
+          ctx.strokeStyle=rgb(mixColor(color,[255,255,255],.8));ctx.lineWidth=.9;
+          ctx.shadowColor=rgb(color);ctx.shadowBlur=4;
+          for(var slot=Math.ceil((first+8)/19);slot*19<last-8;slot++){
+            var clock=time*(1.25+lane*.18)+slot*.67,cycle=clock-Math.floor(clock);
+            if(cycle>.7)continue;
+            var strength=Math.sin(cycle/.7*Math.PI)*reveal;
+            if(strength<.12)continue;
+            var anchor=(slot*19-first)/line.routeStep,open=false;
+            ctx.globalAlpha=strength*.65;ctx.beginPath();
+            for(var j=0;j<=10;j++){
+              var index=anchor+(j/10-.5)*12,p=ribbonPoint(line,index),q=projectInto(...p,{});
+              if(!q.visible||!visibleAt(q.x,q.y,1/q.depth)){open=false;continue;}
+              var a=projectInto(...ribbonPoint(line,index-1),{}),b=projectInto(...ribbonPoint(line,index+1),{});
+              var length=Math.hypot(b.x-a.x,b.y-a.y)||1;
+              var side=(j%2?1:-1)*ropeWidth*(.09+.1*Math.sin(j*2.9+slot*4.1+Math.floor(clock)));
+              var x=q.x-(b.y-a.y)/length*side,y=q.y+(b.x-a.x)/length*side;
+              if(open)ctx.lineTo(x,y);else{ctx.moveTo(x,y);open=true;}
             }
-            if(sparkRandom(seed+13)>.5)points.reverse();
-            var grown=partialPath3D(points,advance);
-            dischargeStroke(grown,opacity*.58,lane,thickness);
-            dischargeStroke(grown.slice(-Math.max(3,Math.round(samples*.14))),opacity*.7,lane,thickness*.8);
-            var branchCount=4+Math.floor(sparkRandom(seed+14)*5);
-            for(var branch=0;branch<branchCount;branch++){
-              var branchSeed=seed+branch*5.81,branchAnchor=3+Math.floor(sparkRandom(branchSeed+1)*(samples-7));
-              var direction=sparkRandom(branchSeed+2)>.5?1:-1,fork=[];
-              var branchLength=5+Math.floor(sparkRandom(branchSeed+3)*10),reach=.18+sparkRandom(branchSeed+4)*.65;
-              var edgeA=points[branchAnchor-1],edgeB=points[branchAnchor+1];
-              var edgeLength=Math.hypot(edgeB[0]-edgeA[0],edgeB[2]-edgeA[2])||1;
-              var branchNx=-(edgeB[2]-edgeA[2])/edgeLength,branchNz=(edgeB[0]-edgeA[0])/edgeLength;
-              for(var q=0;q<=branchLength;q++){
-                var u=q/branchLength,base=points[Math.min(samples,branchAnchor+Math.floor(u*4))];
-                var bend=direction*(u*u*reach+.06*u*Math.sin(u*13+branchSeed));
-                fork.push([base[0]+branchNx*bend,base[1]+u*(.02+reach*.035),base[2]+branchNz*bend]);
-              }
-              var branchAdvance=smoothstep((advance-branchAnchor/samples)/(.15+sparkRandom(branchSeed+5)*.3));
-              if(branchAdvance>0)dischargeStroke(partialPath3D(fork,branchAdvance),opacity*(.25+sparkRandom(branchSeed+6)*.4),lane,thickness*(.3+sparkRandom(branchSeed+7)*.4));
-            }
+            ctx.stroke();
           }
+          ctx.restore();
         });
-        // Rare, brief cross-arcs connect the otherwise independent currents.
+        // Only nearby energy ropes occasionally make a brief contact.
         for(var lane=0;lane<2;lane++){
-          var left=ribbons[lane],right=ribbons[lane+1],first=Math.max(left.routeStart,right.routeStart)+8;
-          var last=Math.min(left.routeStart+(left.length-1)*left.routeStep,right.routeStart+(right.length-1)*right.routeStep)-8;
-          for(var slot=Math.ceil((first-lane*11)/180);slot*180+lane*11<last;slot++){
-            var anchor=slot*180+lane*11,source=slot*31.9+lane*17.3;
-            var clock=time*(.5+sparkRandom(source+1)*1.5)+sparkRandom(source+2);
-            var burst=Math.floor(clock),cycle=clock-burst,seed=source+burst*9.7;
-            if(sparkRandom(seed+11)>.28)continue;
-            var duty=.12+sparkRandom(seed+3)*.22;
-            if(cycle>=duty)continue;
-            var age=cycle/duty,advance=smoothstep(age/(.3+sparkRandom(seed+4)*.5));
-            var opacity=(.18+sparkRandom(seed+5)*.36)*(1-smoothstep((age-.65)/.35));
-            if(opacity<.04||advance<=0)continue;
-            var a=ribbonPoint(left,(anchor-left.routeStart)/left.routeStep),b=ribbonPoint(right,(anchor-right.routeStart)/right.routeStep),points=[];
-            var samples=8+Math.floor(sparkRandom(seed+6)*22),arch=.04+sparkRandom(seed+7)*.2;
-            for(var j=0;j<=samples;j++){
-              var t=j/samples,envelope=Math.sin(t*Math.PI),jitter=(.02+sparkRandom(seed+8)*.1)*Math.sin(t*(27+samples*4)+seed);
-              points.push([a[0]+(b[0]-a[0])*t+jitter,a[1]+(b[1]-a[1])*t+envelope*arch,a[2]+(b[2]-a[2])*t+jitter]);
+          var left=ribbons[lane],right=ribbons[lane+1];
+          var first=Math.max(left.routeStart,right.routeStart)+5;
+          var last=Math.min(left.routeStart+(left.length-1)*left.routeStep,right.routeStart+(right.length-1)*right.routeStep)-5;
+          for(var slot=Math.ceil((first-lane*11)/120);slot*120+lane*11<last;slot++){
+            var clock=time*.7+slot*.83+lane*.41,cycle=clock-Math.floor(clock);
+            if(cycle>.17)continue;
+            var routeIndex=slot*120+lane*11;
+            var a=projectInto(...ribbonPoint(left,(routeIndex-left.routeStart)/left.routeStep),{});
+            var b=projectInto(...ribbonPoint(right,(routeIndex-right.routeStart)/right.routeStep),{});
+            if(!a.visible||!b.visible||Math.hypot(b.x-a.x,b.y-a.y)>48||!visibleAt(a.x,a.y,1/a.depth)||!visibleAt(b.x,b.y,1/b.depth))continue;
+            ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=Math.sin(cycle/.17*Math.PI)*.48*reveal;
+            ctx.strokeStyle=rgb(mixColor(wireColors[lane],wireColors[lane+1],.5));ctx.lineWidth=.9;
+            ctx.shadowColor=ctx.strokeStyle;ctx.shadowBlur=4;ctx.beginPath();ctx.moveTo(a.x,a.y);
+            for(var step=1;step<6;step++){
+              var t=step/6,jitter=Math.sin(step*7.3+slot*2.1+Math.floor(clock)) * 2;
+              ctx.lineTo(a.x+(b.x-a.x)*t-(b.y-a.y)/Math.max(1,Math.hypot(b.x-a.x,b.y-a.y))*jitter,a.y+(b.y-a.y)*t+(b.x-a.x)/Math.max(1,Math.hypot(b.x-a.x,b.y-a.y))*jitter);
             }
-            if(sparkRandom(seed+9)>.5)points.reverse();
-            dischargeStroke(partialPath3D(points,advance),opacity,undefined,.45+sparkRandom(seed+10)*1.1);
+            ctx.lineTo(b.x,b.y);ctx.stroke();ctx.restore();
           }
         }
       }
@@ -1350,9 +1293,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         camera(i);
         drawBackground();skyContext.drawImage(canvas,0,0);drawStreetscape(head);
         var ribbons=lanes.map(lane=>buildRibbon(i,lane));
-        drawConductors(ribbons);
         drawInnerCurrent(ribbons,performance.now()/1000);
-        drawElectricity(ribbons,performance.now()/1000);
       }
       function render(time) { draw(time); }
 
