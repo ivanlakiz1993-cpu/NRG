@@ -1435,7 +1435,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           // A faint conductor remains visible when its energy pulse has passed.
           strokePath3D(line,rgb(mixColor(color,[210,225,245],.45)),(.19+(lane===0?.03:0))*reveal,1.35*weight);
           var phase=reduceMotion?offsets[lane]:((time*speeds[lane]+offsets[lane])%1+1)%1;
-          if(lane===1)phase=1-phase;
           var tail=length*.72,sections=16;
           ctx.save();
           ctx.globalCompositeOperation='lighter';
