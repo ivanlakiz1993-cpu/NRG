@@ -1339,7 +1339,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       function drawInnerCurrent(ribbons,time){
         var reveal=smoothstep(scrollProgress/.025);
         if(reveal<=0)return;
-        var speeds=[.16,.12,.14],offsets=[.08,.47,.76];
+        var speeds=[.23,.19,.21],offsets=[.08,.47,.76];
         ribbons.forEach(function(line,lane){
           if(line.length<2)return;
           var color=wireColors[lane],length=line.length-1;
@@ -1347,36 +1347,40 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           // A faint conductor remains visible when its energy pulse has passed.
           strokePath3D(line,rgb(mixColor(color,[210,225,245],.45)),(.19+(lane===0?.03:0))*reveal,1.35*weight);
           var phase=reduceMotion?offsets[lane]:((time*speeds[lane]+offsets[lane])%1+1)%1;
-          var head=phase*length,tail=Math.min(length*.52,190),sections=20;
+          var tail=length*.72,sections=16;
           ctx.save();
           ctx.globalCompositeOperation='lighter';
           ctx.shadowColor=rgb(color);
           ctx.shadowBlur=width<700?7:11;
-          for(var section=0;section<sections;section++){
-            var from=head-tail+tail*section/sections;
-            var to=head-tail+tail*(section+1)/sections;
-            var t=(section+.5)/sections;
-            var fade=t*t*(3-2*t);
-            var hot=smoothstep((t-.72)/.28);
-            var tone=rgb(mixColor(color,[250,253,255],hot*.9));
-            var path=[];
-            // Split at the loop boundary so the pulse never draws a straight seam.
-            for(var sample=0;sample<=10;sample++){
-              var position=from+(to-from)*sample/10;
-              if(sample&&Math.floor(position/length)!==Math.floor((from+(to-from)*(sample-1)/10)/length)){
-                if(path.length>1){
-                  strokePath3D(path,rgb(color),fade*.16*reveal,8*weight);
-                  strokePath3D(path,tone,fade*.74*reveal,2.7*weight);
-                  if(hot>0)strokePath3D(path,'rgb(255,255,255)',hot*fade*.72*reveal,.85*weight);
+          // Two overlapping pulses keep colour moving across the whole conductor.
+          for(var pulse=0;pulse<2;pulse++){
+            var head=((phase+pulse*.5)%1)*length;
+            for(var section=0;section<sections;section++){
+              var from=head-tail+tail*section/sections;
+              var to=head-tail+tail*(section+1)/sections;
+              var t=(section+.5)/sections;
+              var fade=.1+.9*t*t*(3-2*t);
+              var hot=smoothstep((t-.72)/.28);
+              var tone=rgb(mixColor(color,[250,253,255],hot*.9));
+              var path=[];
+              // Split at the loop boundary so the pulse never draws a straight seam.
+              for(var sample=0;sample<=10;sample++){
+                var position=from+(to-from)*sample/10;
+                if(sample&&Math.floor(position/length)!==Math.floor((from+(to-from)*(sample-1)/10)/length)){
+                  if(path.length>1){
+                    strokePath3D(path,rgb(color),fade*.16*reveal,8*weight);
+                    strokePath3D(path,tone,fade*.74*reveal,2.7*weight);
+                    if(hot>0)strokePath3D(path,'rgb(255,255,255)',hot*fade*.72*reveal,.85*weight);
+                  }
+                  path=[];
                 }
-                path=[];
+                path.push(ribbonPoint(line,((position%length)+length)%length));
               }
-              path.push(ribbonPoint(line,((position%length)+length)%length));
-            }
-            if(path.length>1){
-              strokePath3D(path,rgb(color),fade*.16*reveal,8*weight);
-              strokePath3D(path,tone,fade*.74*reveal,2.7*weight);
-              if(hot>0)strokePath3D(path,'rgb(255,255,255)',hot*fade*.72*reveal,.85*weight);
+              if(path.length>1){
+                strokePath3D(path,rgb(color),fade*.16*reveal,8*weight);
+                strokePath3D(path,tone,fade*.74*reveal,2.7*weight);
+                if(hot>0)strokePath3D(path,'rgb(255,255,255)',hot*fade*.72*reveal,.85*weight);
+              }
             }
           }
           ctx.restore();
