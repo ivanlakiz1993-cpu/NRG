@@ -103,7 +103,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         [363,65,-185],[378,76,-185],[392,72,-185],[405,66,-187],
         [416,62,-197],[423,61,-215],[425,61,-240],[425,61,-274],
         [425,61,-310],[425,61,-347],[425,61,-385],[425,61,-423],
-        [425,61,-454],[425,61,-485]
+        [425,61,-454],[425,61,-485],[425,61,-530],[425,61,-575],[425,61,-625],[425,61,-670]
       ],36);      function at(i){i=Math.max(0,Math.min(route.length-1,i));var k=Math.floor(i),a=route[k],b=route[Math.min(k+1,route.length-1)];return a.map((v,j)=>v+(b[j]-v)*(i-k))}
       var sceneStart=90;
       var originalRouteEnd=26*36;
@@ -774,25 +774,26 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       }
       // The upper reservoir opens into farmland after the route turns left.
       var uplandPanels=[
-        {points:[[371,56.35,-314],[405,56.35,-314],[414,56.35,-235],[427,56.35,-185],[430,56.35,-55],[371,56.35,-55]],color:'#11191b'},
-        {points:[[435,56.12,-205],[550,56.12,-205],[550,56.12,-550],[436,56.12,-550]],color:'#151515'},
-        {points:[[300,56.12,-319],[416,56.12,-319],[416,56.12,-550],[300,56.12,-550]],color:'#171717'}
+        {points:[[367,56.35,-460],[435,56.35,-460],[435,56.35,-220],[427,56.35,-185],[430,56.35,-55],[367,56.35,-55]],color:'#11191b'},
+        {points:[[445,56.12,-390],[550,56.12,-390],[550,56.12,-700],[445,56.12,-700]],color:'#151515'},
+        {points:[[300,56.12,-390],[357,56.12,-390],[357,56.12,-700],[300,56.12,-700]],color:'#171717'},
+        {points:[[367,56.12,-460],[445,56.12,-460],[445,56.12,-700],[367,56.12,-700]],color:'#131313'}
       ];
       var uplandPaths=[
-        [[371,56.5,-314],[405,56.5,-314],[414,56.5,-235],[427,56.5,-185],[430,56.5,-55]],
-        [[435,56.3,-205],[436,56.3,-550]],[[416,56.3,-319],[416,56.3,-550]]
+        [[367,56.5,-460],[367,56.5,-55]],[[435,56.5,-460],[435,56.5,-220],[427,56.5,-185],[430,56.5,-55]],
+        [[445,56.3,-390],[445,56.3,-700]],[[357,56.3,-390],[357,56.3,-700]],[[367,56.3,-460],[367,56.3,-700]]
       ];
       var fieldHills=[];
       for(var bank of [-1,1])for(var ridge=0;ridge<3;ridge++){
-        var near=-245-ridge*105,far=near-96,outer=bank<0?285:565,inner=bank<0?305:545;
+        var near=-410-ridge*95,far=near-96,outer=bank<0?285:565,inner=bank<0?305:545;
         fieldHills.push([[inner,56,near],[outer,66+ridge*4,near-18],[outer+(bank<0?-14:14),76+ridge*5,near-48],[outer,64+ridge*3,far+18],[inner,56,far]]);
       }
       var turbines=[
-        {x:455,z:-270,height:57,radius:23,phase:.15},
-        {x:397,z:-310,height:61,radius:25,phase:1.3},
-        {x:458,z:-370,height:55,radius:22,phase:2.15},
-        {x:395,z:-415,height:59,radius:24,phase:.8},
-        {x:455,z:-485,height:58,radius:23,phase:1.85}
+        {x:466,z:-440,height:57,radius:23,phase:.15},
+        {x:340,z:-475,height:61,radius:25,phase:1.3},
+        {x:467,z:-520,height:55,radius:22,phase:2.15},
+        {x:338,z:-560,height:59,radius:24,phase:.8},
+        {x:466,z:-610,height:58,radius:23,phase:1.85}
       ];
       turbines.forEach(function(turbine){
         var x=turbine.x,z=turbine.z,hub=56+turbine.height;
@@ -803,13 +804,13 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       var uplandDepthEntries=uplandPanels.map(p=>({building:{seed:92},face:{points:p.points},grow:1}));
       function drawUpperWater(reveal){
         var time=reduceMotion?0:performance.now()*.001;
-        for(var current=0;current<12;current++){
-          var z=-303+current*20.5,flow=[];
-          for(var x=374;x<=403;x+=2.9)flow.push([x,56.42,z+Math.sin(x*.32-time*.85+current)*.42]);
+        for(var current=0;current<19;current++){
+          var z=-450+current*20.5,flow=[];
+          for(var x=372;x<=428;x+=2.9)flow.push([x,56.42,z+Math.sin(x*.32-time*.85+current)*.42]);
           strokePath3D(flow,rgb(contourBase),reveal*(.13+(current%3)*.035),.58);
         }
-        for(var ripple=0;ripple<42;ripple++){
-          var x=374+((ripple*11.9+time*2.2)%28),z=-307+(ripple*37.7%245);
+        for(var ripple=0;ripple<72;ripple++){
+          var x=372+((ripple*11.9+time*2.2)%57),z=-455+(ripple*37.7%390);
           var flicker=.6+.4*Math.sin(time*1.3+ripple*2.1);
           strokePath3D([[x,56.47,z],[x+1.8+(ripple%3),56.47,z+.24]],rgb(contourGlint),reveal*flicker*.25,.55);
         }
@@ -837,13 +838,13 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       function drawUplandScene(head){
         var reveal=smoothstep((head[0]-365)/24);
         if(reveal<=0)return;
-        for(var panel=0;panel<3;panel++)fillSurface3D(uplandPanels[panel].points,uplandPanels[panel].color,reveal);
+        for(var panel=0;panel<4;panel++)fillSurface3D(uplandPanels[panel].points,uplandPanels[panel].color,reveal);
         fieldHills.forEach(function(hill){fillSurface3D(hill,'#171717',reveal);strokePath3D(hill.slice(1,4),rgb(contourBase),reveal*.42,.8);});
         uplandPaths.forEach(path=>strokePath3D(path,rgb(contourBase),reveal*.62,.9));
         drawUpperWater(reveal);
         for(var side of [-1,1]){
-          var parcels=side<0?[[-326,-390],[-396,-463],[-469,-545]]:[[-215,-300],[-306,-395],[-401,-545]];
-          var edge=side<0?[301,413]:[439,548];
+          var parcels=[[-400,-485],[-491,-580],[-586,-690]];
+          var edge=side<0?[301,356]:[447,548];
           parcels.forEach(function(parcel,plot){
             strokePath3D([[edge[0],56.24,parcel[0]],[edge[1],56.24,parcel[0]]],rgb(contourBase),reveal*.28,.75);
             for(var furrow=0;furrow<9;furrow++){
