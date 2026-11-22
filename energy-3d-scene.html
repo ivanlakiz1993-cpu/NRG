@@ -1339,96 +1339,48 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       function drawInnerCurrent(ribbons,time){
         var reveal=smoothstep(scrollProgress/.025);
         if(reveal<=0)return;
-        var speeds=[.22,.19,.2];
+        var speeds=[.16,.12,.14],offsets=[.08,.47,.76];
         ribbons.forEach(function(line,lane){
           if(line.length<2)return;
-          var color=wireColors[lane],highlight=mixColor(color,[255,255,255],.55);
-          var ropeWidth=width<700?5:6.8;
-          var breath=reduceMotion?.8:.78+.12*Math.sin(time*(1.5+lane*.2)+lane*1.7);
-          // The visible path is energy itself: a continuous coloured body with moving inner strands.
-          strokePath3D(line,rgb(mixColor(color,[0,0,0],.3)),reveal,ropeWidth+1);
-          strokePath3D(line,rgb(color),reveal,ropeWidth);
-          strokePath3D(line,rgb(highlight),breath*reveal,ropeWidth*.46);
-          // Five phase-shifted filaments coil around the body, flowing at different rates.
-          for(var filament=0;filament<5;filament++){
-            var strandPath=[],phase=filament*Math.PI*2/5;
-            for(var sample=0;sample<line.length;sample+=2){
-              var point=line[sample],before=line[Math.max(0,sample-2)],after=line[Math.min(line.length-1,sample+2)];
-              var length=Math.hypot(after[0]-before[0],after[2]-before[2])||1;
-              var nx=-(after[2]-before[2])/length,nz=(after[0]-before[0])/length;
-              var wave=(line.routeStart+sample*line.routeStep)*.32-time*(reduceMotion?0:3.2+lane*.45)+phase;
-              var side=Math.cos(wave)*.065,up=Math.sin(wave)*.028;
-              strandPath.push([point[0]+nx*side,point[1]+up,point[2]+nz*side]);
-            }
-            if((line.length-1)%2)strandPath.push(line[line.length-1]);
-            strokePath3D(strandPath,rgb(mixColor(color,[255,255,255],.32+filament*.1)),(.48+filament*.06)*reveal,1.4);
-          }
-          var travel=reduceMotion?0:time*speeds[lane];
-          for(var packet=0;packet<3;packet++){
-            var phase=((travel+packet/3+lane*.17)%1+1)%1;
-            var start=phase*(line.length-1),span=(line.length-1)*.3;
-            var points=[];
-            for(var step=0;step<=24;step++)points.push(ribbonPoint(line,(start+span*step/24)%(line.length-1)));
-            // Six softly graded sections keep the pulse inside the conductor without per-pixel work.
-            for(var section=0;section<6;section++){
-              var alpha=Math.sin((section+.5)/6*Math.PI)*reveal,path=[];
-              for(var segment=section*4;segment<=section*4+4;segment++){
-                if(segment>section*4&&(start+span*segment/24)%(line.length-1)<(start+span*(segment-1)/24)%(line.length-1)){
-                  if(path.length>1){strokePath3D(path,rgb(color),alpha*.9,ropeWidth*.65);strokePath3D(path,rgb(highlight),alpha*.98,ropeWidth*.3);}
-                  path=[];
+          var color=wireColors[lane],length=line.length-1;
+          var weight=(width<700?.78:1)*(lane===0?1.2:lane===1?.82:.9);
+          // A faint conductor remains visible when its energy pulse has passed.
+          strokePath3D(line,rgb(mixColor(color,[210,225,245],.45)),(.19+(lane===0?.03:0))*reveal,1.35*weight);
+          var phase=reduceMotion?offsets[lane]:((time*speeds[lane]+offsets[lane])%1+1)%1;
+          var head=phase*length,tail=Math.min(length*.52,190),sections=20;
+          ctx.save();
+          ctx.globalCompositeOperation='lighter';
+          ctx.shadowColor=rgb(color);
+          ctx.shadowBlur=width<700?7:11;
+          for(var section=0;section<sections;section++){
+            var from=head-tail+tail*section/sections;
+            var to=head-tail+tail*(section+1)/sections;
+            var t=(section+.5)/sections;
+            var fade=t*t*(3-2*t);
+            var hot=smoothstep((t-.72)/.28);
+            var tone=rgb(mixColor(color,[250,253,255],hot*.9));
+            var path=[];
+            // Split at the loop boundary so the pulse never draws a straight seam.
+            for(var sample=0;sample<=10;sample++){
+              var position=from+(to-from)*sample/10;
+              if(sample&&Math.floor(position/length)!==Math.floor((from+(to-from)*(sample-1)/10)/length)){
+                if(path.length>1){
+                  strokePath3D(path,rgb(color),fade*.16*reveal,8*weight);
+                  strokePath3D(path,tone,fade*.74*reveal,2.7*weight);
+                  if(hot>0)strokePath3D(path,'rgb(255,255,255)',hot*fade*.72*reveal,.85*weight);
                 }
-                path.push(points[segment]);
+                path=[];
               }
-              if(path.length>1){strokePath3D(path,rgb(color),alpha*.9,ropeWidth*.65);strokePath3D(path,rgb(highlight),alpha*.98,ropeWidth*.3);}
+              path.push(ribbonPoint(line,((position%length)+length)%length));
             }
-          }
-          // Brief jagged discharges cross the thinner stream without spreading far outside it.
-          var first=line.routeStart,last=first+(line.length-1)*line.routeStep;
-          ctx.save();ctx.globalCompositeOperation='lighter';ctx.lineCap='round';ctx.lineJoin='round';
-          ctx.shadowColor=rgb(color);ctx.shadowBlur=5;
-          for(var slot=Math.ceil((first+8)/17);slot*17<last-8;slot++){
-            var clock=time*(1.25+lane*.18)+slot*.67,cycle=clock-Math.floor(clock);
-            if(cycle>.74)continue;
-            var strength=Math.sin(cycle/.74*Math.PI)*reveal;
-            if(strength<.12)continue;
-            var anchor=(slot*17-first)/line.routeStep,open=false;
-            ctx.beginPath();
-            for(var j=0;j<=10;j++){
-              var index=anchor+(j/10-.5)*12,p=ribbonPoint(line,index),q=projectInto(...p,{});
-              if(!q.visible||!visibleAt(q.x,q.y,1/q.depth)){open=false;continue;}
-              var a=projectInto(...ribbonPoint(line,index-1),{}),b=projectInto(...ribbonPoint(line,index+1),{});
-              var length=Math.hypot(b.x-a.x,b.y-a.y)||1;
-              var side=(j%2?1:-1)*ropeWidth*(.35+.13*Math.sin(j*2.9+slot*4.1+Math.floor(clock)));
-              var x=q.x-(b.y-a.y)/length*side,y=q.y+(b.x-a.x)/length*side;
-              if(open)ctx.lineTo(x,y);else{ctx.moveTo(x,y);open=true;}
+            if(path.length>1){
+              strokePath3D(path,rgb(color),fade*.16*reveal,8*weight);
+              strokePath3D(path,tone,fade*.74*reveal,2.7*weight);
+              if(hot>0)strokePath3D(path,'rgb(255,255,255)',hot*fade*.72*reveal,.85*weight);
             }
-            ctx.globalAlpha=strength*.65;ctx.strokeStyle=rgb(color);ctx.lineWidth=2;ctx.stroke();
-            ctx.globalAlpha=strength*.9;ctx.strokeStyle=rgb(mixColor(color,[255,255,255],.85));ctx.lineWidth=.85;ctx.stroke();
           }
           ctx.restore();
         });
-        // Only nearby energy ropes occasionally make a brief contact.
-        for(var lane=0;lane<2;lane++){
-          var left=ribbons[lane],right=ribbons[lane+1];
-          var first=Math.max(left.routeStart,right.routeStart)+5;
-          var last=Math.min(left.routeStart+(left.length-1)*left.routeStep,right.routeStart+(right.length-1)*right.routeStep)-5;
-          for(var slot=Math.ceil((first-lane*11)/120);slot*120+lane*11<last;slot++){
-            var clock=time*.7+slot*.83+lane*.41,cycle=clock-Math.floor(clock);
-            if(cycle>.17)continue;
-            var routeIndex=slot*120+lane*11;
-            var a=projectInto(...ribbonPoint(left,(routeIndex-left.routeStart)/left.routeStep),{});
-            var b=projectInto(...ribbonPoint(right,(routeIndex-right.routeStart)/right.routeStep),{});
-            if(!a.visible||!b.visible||Math.hypot(b.x-a.x,b.y-a.y)>48||!visibleAt(a.x,a.y,1/a.depth)||!visibleAt(b.x,b.y,1/b.depth))continue;
-            ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=Math.sin(cycle/.17*Math.PI)*.48*reveal;
-            ctx.strokeStyle=rgb(mixColor(wireColors[lane],wireColors[lane+1],.5));ctx.lineWidth=.9;
-            ctx.shadowColor=ctx.strokeStyle;ctx.shadowBlur=4;ctx.beginPath();ctx.moveTo(a.x,a.y);
-            for(var step=1;step<6;step++){
-              var t=step/6,jitter=Math.sin(step*7.3+slot*2.1+Math.floor(clock)) * 2;
-              ctx.lineTo(a.x+(b.x-a.x)*t-(b.y-a.y)/Math.max(1,Math.hypot(b.x-a.x,b.y-a.y))*jitter,a.y+(b.y-a.y)*t+(b.x-a.x)/Math.max(1,Math.hypot(b.x-a.x,b.y-a.y))*jitter);
-            }
-            ctx.lineTo(b.x,b.y);ctx.stroke();ctx.restore();
-          }
-        }
       }
       function draw(){
         const i=sceneStart+scrollProgress*(route.length-1-sceneStart),head=at(i);
