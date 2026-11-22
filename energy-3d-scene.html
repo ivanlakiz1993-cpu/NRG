@@ -861,7 +861,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         }
         return pane.lightOpacity*smoothstep(elapsed/(.05+.05*windowRandom(pane.lightDelay)));
       }
-      function drawWindowLight(points,color,alpha,depthClipped){
+      function drawWindowLight(points,color,alpha,depthClipped,facePoints){
         var projected=points.map(p=>projectInto(...p,{}));
         if(projected.some(p=>!p.visible))return;
         var xs=projected.map(p=>p.x),ys=projected.map(p=>p.y);
@@ -872,6 +872,29 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         gradient.addColorStop(0,rgb(mixColor(color,[255,255,255],.26)));
         gradient.addColorStop(.5,rgb(color));
         gradient.addColorStop(1,rgb(mixColor(color,[20,22,28],.24)));
+        // Draw the diffuse halo on the wall itself, behind the bright window pane.
+        if(right-left>5&&bottom-top>5){
+          ctx.save();
+          if(facePoints){
+            var facade=clipPolygon(facePoints).map(p=>projectInto(...p,{}));
+            if(facade.length>=3){
+              ctx.beginPath();ctx.moveTo(facade[0].x,facade[0].y);
+              for(var corner=1;corner<facade.length;corner++)ctx.lineTo(facade[corner].x,facade[corner].y);
+              ctx.closePath();ctx.clip();
+            }
+          }
+          ctx.globalCompositeOperation='lighter';
+          ctx.globalAlpha=alpha*.55;
+          ctx.translate(cx,cy);
+          ctx.scale(Math.max(9,(right-left)*.78),Math.max(9,(bottom-top)*1.03));
+          var halo=ctx.createRadialGradient(0,0,.34,0,0,1);
+          halo.addColorStop(0,rgb(color,.36));
+          halo.addColorStop(.55,rgb(color,.19));
+          halo.addColorStop(1,rgb(color,0));
+          ctx.fillStyle=halo;
+          ctx.fillRect(-1,-1,2,2);
+          ctx.restore();
+        }
         ctx.save();
         ctx.shadowColor=rgb(color,.42);
         ctx.shadowBlur=Math.min(14,Math.max(3,(right-left)*.13));
@@ -926,8 +949,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               var brightness=windowLightAmount(pane,light,lightNow);
               if(brightness>0&&amount>.95){
                 var paneAlpha=brightness*smoothstep((amount-.95)/.05)*leave;
-                if(building.final)factoryWindows.push({points:pane.points,color:pane.lightColor,alpha:paneAlpha});
-                else if(windowVisible(pane.points))drawWindowLight(pane.points,pane.lightColor,paneAlpha,false);
+                if(building.final)factoryWindows.push({points:pane.points,face:face.points,color:pane.lightColor,alpha:paneAlpha});
+                else if(windowVisible(pane.points))drawWindowLight(pane.points,pane.lightColor,paneAlpha,false,face.points);
               }
             });return;}
             // A travelling, continuous light band sweeps across the complete facade.
@@ -984,7 +1007,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         });
         // Glazing is clipped at construction, then depth-tested per visible pixel.
         factoryWindows.forEach(function(pane){
-          drawWindowLight(pane.points,pane.color,pane.alpha,true);
+          drawWindowLight(pane.points,pane.color,pane.alpha,true,pane.face);
           strokePath3D(pane.points.concat([pane.points[0]]),rgb(contourBase),.85,.7);
           var p=pane.points,mid=(a,b)=>a.map((v,i)=>(v+b[i])*.5);
           strokePath3D([mid(p[0],p[1]),mid(p[3],p[2])],rgb(contourBase),.65,.65);
