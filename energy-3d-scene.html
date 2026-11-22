@@ -632,21 +632,42 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       function damFaceX(z,y){return 349+.0013*(z+185)*(z+185)+11*y/56;}
       function damFront(z,y,offset){return [damFaceX(z,y)-(offset||0),y,z];}
       hydroPanel([[186,.03,-220],[347,.03,-220],[347,.03,-150],[186,.03,-150]],'#111111');
-      var bankShelfLevels=[5,6.4,6.2,7.8,7.1,8.5,8.2,9.4,10.2];
-      var bankRidgeLevels=[24,28,26,33,29,36,33,39,41];
+      var bankProfiles=[
+        {x:[190,208,225,249,266,287,305,329,346],shelf:[5,6.9,6.2,8.1,7,9.3,8,9.5,10.2],ridge:[24,30,27,35,29,37,33,40,41],ledge:[6,9,5,8,7,10,6,8,7],crest:[19,24,20,27,22,25,18,26,21]},
+        {x:[190,212,228,244,269,284,309,327,346],shelf:[6,7.3,6,8.7,7.8,8.3,9.6,8.5,11],ridge:[27,25,33,30,38,32,40,35,42],ledge:[7,5,9,6,10,7,8,5,9],crest:[22,18,26,21,29,20,27,19,25]}
+      ];
+      var lowerRockShades=['#161616','#1b1b1b','#181818','#1e1e1e','#171717'];
+      var upperRockShades=['#222222','#292929','#1f1f1f','#262626','#242424'];
       for(var bank of [-1,1]){
-        var edgeZ=bank<0?-220:-150,shelfZ=bank<0?-226:-144,outerZ=bank<0?-239:-131;
+        var edgeZ=bank<0?-220:-150,profile=bankProfiles[bank<0?0:1];
         for(var reach=0;reach<8;reach++){
-          var ax=190+reach*20,bx=reach===7?346:ax+20;
-          var shelfA=bankShelfLevels[reach]+(bank>0?1:0),shelfB=bankShelfLevels[reach+1]+(bank>0?1:0);
-          var ridgeA=bankRidgeLevels[reach]+(bank>0?2:0),ridgeB=bankRidgeLevels[reach+1]+(bank>0?2:0);
-          hydroPanel([[ax,0,edgeZ],[bx,0,edgeZ],[bx,shelfB,shelfZ],[ax,shelfA,shelfZ]],reach%2?'#171717':'#1d1d1d');
-          hydroPanel([[ax,shelfA,shelfZ],[bx,shelfB,shelfZ],[bx,ridgeB,outerZ],[ax,ridgeA,outerZ]],reach%2?'#202020':'#272727');
-          hydroPanel([[ax,ridgeA,outerZ],[bx,ridgeB,outerZ],[bx,ridgeB+6,outerZ+bank*23],[ax,ridgeA+6,outerZ+bank*23]],'#141414');
-          hydroLine([[ax,0,edgeZ],[ax+10,.18,edgeZ+bank*1.5],[bx,0,edgeZ]],1.1,.85);
-          hydroLine([[ax,shelfA,shelfZ],[ax+10,(shelfA+shelfB)*.5+.8,shelfZ],[bx,shelfB,shelfZ]],.7,.58);
-          hydroLine([[ax,ridgeA,outerZ],[ax+8,(ridgeA+ridgeB)*.5+2,outerZ+bank*4],[bx,ridgeB,outerZ]],1,.74);
-          hydroLine([[ax+3,shelfA,shelfZ],[ax+9,(ridgeA+ridgeB)*.32,(shelfZ+outerZ)*.5],[bx-2,ridgeB,outerZ]],.55,.42);
+          var ax=profile.x[reach],bx=profile.x[reach+1],tone=(reach*3+(bank>0?2:0))%5;
+          var edgeA=[ax,0,edgeZ],edgeB=[bx,0,edgeZ];
+          var shelfA=[ax,profile.shelf[reach],edgeZ+bank*profile.ledge[reach]];
+          var shelfB=[bx,profile.shelf[reach+1],edgeZ+bank*profile.ledge[reach+1]];
+          var ridgeA=[ax,profile.ridge[reach],edgeZ+bank*profile.crest[reach]];
+          var ridgeB=[bx,profile.ridge[reach+1],edgeZ+bank*profile.crest[reach+1]];
+          var topA=[ax,ridgeA[1]+6,ridgeA[2]+bank*23],topB=[bx,ridgeB[1]+6,ridgeB[2]+bank*23];
+          if(reach%2){
+            hydroPanel([edgeA,edgeB,shelfA],lowerRockShades[tone]);
+            hydroPanel([edgeB,shelfB,shelfA],lowerRockShades[(tone+2)%5]);
+            hydroPanel([shelfA,shelfB,ridgeA],upperRockShades[tone]);
+            hydroPanel([shelfB,ridgeB,ridgeA],upperRockShades[(tone+3)%5]);
+          }else{
+            hydroPanel([edgeA,edgeB,shelfB],lowerRockShades[tone]);
+            hydroPanel([edgeA,shelfB,shelfA],lowerRockShades[(tone+2)%5]);
+            hydroPanel([shelfA,shelfB,ridgeB],upperRockShades[tone]);
+            hydroPanel([shelfA,ridgeB,ridgeA],upperRockShades[(tone+3)%5]);
+          }
+          hydroPanel([ridgeA,ridgeB,topB,topA],upperRockShades[(tone+1)%5]);
+          hydroLine([edgeA,[(ax+bx)*.5,.18,edgeZ+bank*1.1],edgeB],1,.78);
+          hydroLine([shelfA,shelfB],.7,.63);
+          hydroLine([ridgeA,ridgeB],.9,.7);
+          var crack=(.22+((reach*7+(bank>0?2:0))%5)*.13);
+          function between(a,b,t){return a.map((v,i)=>v+(b[i]-v)*t);}
+          hydroLine([between(topA,topB,crack),between(ridgeA,ridgeB,crack),between(shelfA,shelfB,crack),between(edgeA,edgeB,crack)].map(p=>[p[0]-.25,p[1],p[2]]),.7,.68);
+          var second=(reach+bank+8)%3===0?.82:.31;
+          hydroLine([between(ridgeA,ridgeB,second),between(shelfA,shelfB,Math.max(.08,second-.13)),between(edgeA,edgeB,Math.max(.08,second-.2))].map(p=>[p[0]-.25,p[1],p[2]]),.45,.4);
         }
       }
       var bankPanelEnd=hydroPanels.length,bankPathEnd=hydroPaths.length;
