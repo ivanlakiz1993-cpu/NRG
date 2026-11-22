@@ -12,7 +12,7 @@ $checks = @'
       cancelAnimationFrame(raf);raf=0;
       var results=[],captures=[];
       function check(condition,name){results.push({name:name,pass:!!condition});}
-      function moveTo(x){currentRouteIndex=nearestRouteIndex(x,-185,originalRouteEnd);scrollProgress=currentRouteIndex/(route.length-1);draw();}
+      function moveTo(x){currentRouteIndex=nearestRouteIndex(x,-185,originalRouteEnd);scrollProgress=(currentRouteIndex-sceneStart)/(route.length-1-sceneStart);draw();}
       try{
         check(width===viewport[0]&&height===viewport[1],'Exact requested canvas viewport');
         prepareFactoryDetails(finalFactory);
