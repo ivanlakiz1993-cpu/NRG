@@ -1400,18 +1400,20 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           var turn=smoothstep((k-originalRouteEnd)/90),a=at(k-1),b=at(k+1);
           var dx=b[0]-a[0],dz=b[2]-a[2],length=Math.hypot(dx,dz)||1;
           var nx=1-turn+(-dz/length)*turn,nz=(dx/length)*turn;
-          var base=[-1.55,0,1.55][wireIndex],amplitude=[.18,.24,.18][wireIndex];
-          var frequency=[.021,.017,.024][wireIndex],phase=[.7,2.35,4.65][wireIndex];
-          var lateral=base+amplitude*Math.sin(k*frequency+phase)+.04*Math.sin(k*.052+phase*1.7);
-          var attachment=[0,0,0];
+          var base=[-1.55,0,1.55][wireIndex];
+          var frequency=[.032,.043,.037][wireIndex],phase=[.45,2.55,4.35][wireIndex];
+          var weave=[2.15,1.75,2.2][wireIndex]*Math.sin(k*frequency+phase)
+            +.36*Math.sin(k*frequency*.55+phase*1.6);
+          var lateral=base,attachment=[0,0,0],socketInfluence=0;
           stops.forEach(function(stop){
             var distance=Math.hypot(v[0]-stop.socket[0],v[2]-stop.front);
             var influence=1-smoothstep((distance-2)/14);
+            socketInfluence=Math.max(socketInfluence,influence);
             var offsets=stop===stops[0]?[-.3,-.05,-3.2]:stop.kind===0?[-.3,-.05,2.9]:[-2.0,-2.1,.1];
             attachment[wireIndex]+=offsets[wireIndex]*influence;
           });
-          lateral+=attachment[wireIndex];
-          var vertical=lane*.055+.065*Math.cos(k*frequency*.82+phase);
+          lateral+=weave*(1-socketInfluence*.88)+attachment[wireIndex];
+          var vertical=lane*.055+.095*Math.cos(k*frequency*.82+phase);
           var p=[v[0]+nx*lateral,v[1]+vertical,v[2]+nz*lateral];
           line.push(p);
         }
@@ -1433,6 +1435,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           // A faint conductor remains visible when its energy pulse has passed.
           strokePath3D(line,rgb(mixColor(color,[210,225,245],.45)),(.19+(lane===0?.03:0))*reveal,1.35*weight);
           var phase=reduceMotion?offsets[lane]:((time*speeds[lane]+offsets[lane])%1+1)%1;
+          if(lane===1)phase=1-phase;
           var tail=length*.72,sections=16;
           ctx.save();
           ctx.globalCompositeOperation='lighter';
