@@ -1200,10 +1200,10 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         ribbons.forEach(function(line,lane){
           if(line.length<2)return;
           var color=wireColors[lane],highlight=mixColor(color,[255,255,255],.55);
-          var ropeWidth=width<700?7.5:10.5;
+          var ropeWidth=width<700?5:6.8;
           var breath=reduceMotion?.8:.78+.12*Math.sin(time*(1.5+lane*.2)+lane*1.7);
           // The visible path is energy itself: a continuous coloured body with moving inner strands.
-          strokePath3D(line,rgb(mixColor(color,[0,0,0],.3)),reveal,ropeWidth+2);
+          strokePath3D(line,rgb(mixColor(color,[0,0,0],.3)),reveal,ropeWidth+1);
           strokePath3D(line,rgb(color),reveal,ropeWidth);
           strokePath3D(line,rgb(highlight),breath*reveal,ropeWidth*.46);
           // Five phase-shifted filaments coil around the body, flowing at different rates.
@@ -1214,7 +1214,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               var length=Math.hypot(after[0]-before[0],after[2]-before[2])||1;
               var nx=-(after[2]-before[2])/length,nz=(after[0]-before[0])/length;
               var wave=(line.routeStart+sample*line.routeStep)*.32-time*(reduceMotion?0:3.2+lane*.45)+phase;
-              var side=Math.cos(wave)*.11,up=Math.sin(wave)*.045;
+              var side=Math.cos(wave)*.065,up=Math.sin(wave)*.028;
               strandPath.push([point[0]+nx*side,point[1]+up,point[2]+nz*side]);
             }
             if((line.length-1)%2)strandPath.push(line[line.length-1]);
@@ -1239,28 +1239,28 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               if(path.length>1){strokePath3D(path,rgb(color),alpha*.9,ropeWidth*.65);strokePath3D(path,rgb(highlight),alpha*.98,ropeWidth*.3);}
             }
           }
-          // Short electric bridges stay inside the coloured rope and connect its moving filaments.
+          // Brief jagged discharges cross the thinner stream without spreading far outside it.
           var first=line.routeStart,last=first+(line.length-1)*line.routeStep;
           ctx.save();ctx.globalCompositeOperation='lighter';ctx.lineCap='round';ctx.lineJoin='round';
-          ctx.strokeStyle=rgb(mixColor(color,[255,255,255],.8));ctx.lineWidth=.9;
-          ctx.shadowColor=rgb(color);ctx.shadowBlur=4;
-          for(var slot=Math.ceil((first+8)/19);slot*19<last-8;slot++){
+          ctx.shadowColor=rgb(color);ctx.shadowBlur=5;
+          for(var slot=Math.ceil((first+8)/17);slot*17<last-8;slot++){
             var clock=time*(1.25+lane*.18)+slot*.67,cycle=clock-Math.floor(clock);
-            if(cycle>.7)continue;
-            var strength=Math.sin(cycle/.7*Math.PI)*reveal;
+            if(cycle>.74)continue;
+            var strength=Math.sin(cycle/.74*Math.PI)*reveal;
             if(strength<.12)continue;
-            var anchor=(slot*19-first)/line.routeStep,open=false;
-            ctx.globalAlpha=strength*.65;ctx.beginPath();
+            var anchor=(slot*17-first)/line.routeStep,open=false;
+            ctx.beginPath();
             for(var j=0;j<=10;j++){
               var index=anchor+(j/10-.5)*12,p=ribbonPoint(line,index),q=projectInto(...p,{});
               if(!q.visible||!visibleAt(q.x,q.y,1/q.depth)){open=false;continue;}
               var a=projectInto(...ribbonPoint(line,index-1),{}),b=projectInto(...ribbonPoint(line,index+1),{});
               var length=Math.hypot(b.x-a.x,b.y-a.y)||1;
-              var side=(j%2?1:-1)*ropeWidth*(.09+.1*Math.sin(j*2.9+slot*4.1+Math.floor(clock)));
+              var side=(j%2?1:-1)*ropeWidth*(.35+.13*Math.sin(j*2.9+slot*4.1+Math.floor(clock)));
               var x=q.x-(b.y-a.y)/length*side,y=q.y+(b.x-a.x)/length*side;
               if(open)ctx.lineTo(x,y);else{ctx.moveTo(x,y);open=true;}
             }
-            ctx.stroke();
+            ctx.globalAlpha=strength*.65;ctx.strokeStyle=rgb(color);ctx.lineWidth=2;ctx.stroke();
+            ctx.globalAlpha=strength*.9;ctx.strokeStyle=rgb(mixColor(color,[255,255,255],.85));ctx.lineWidth=.85;ctx.stroke();
           }
           ctx.restore();
         });
