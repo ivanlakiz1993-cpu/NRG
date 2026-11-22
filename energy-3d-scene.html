@@ -1479,8 +1479,11 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           ctx.restore();
         });
       }
+      var crossingFlashes=new Map(),lastSparkRouteIndex=0;
       function drawCrossingSparks(ribbons,time){
-        if(scrollProgress<.015)return;
+        if(reduceMotion||scrollProgress<.015)return;
+        if(currentRouteIndex<lastSparkRouteIndex-20)crossingFlashes.clear();
+        lastSparkRouteIndex=currentRouteIndex;
         ctx.save();ctx.globalCompositeOperation='lighter';ctx.lineCap='round';
         for(var first=0;first<2;first++)for(var second=first+1;second<3;second++){
           var a=ribbons[first],b=ribbons[second],count=Math.min(a.length,b.length);
@@ -1493,15 +1496,18 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             if(distance>1.2)continue;
             var p=projectInto((a[j][0]+b[j][0])*.5,(a[j][1]+b[j][1])*.5+.09,(a[j][2]+b[j][2])*.5,{});
             if(!p.visible||p.x<0||p.x>width||p.y<0||p.y>height||!visibleAt(p.x,p.y,1/p.depth))continue;
-            var flash=reduceMotion?.7:Math.max(0,Math.sin(time*19+j*.47+first*2.3));
-            if(flash<.25)continue;
+            var key=first+':'+second+':'+Math.round((a.routeStart+j*a.routeStep)/6);
+            if(!crossingFlashes.has(key))crossingFlashes.set(key,time);
+            var age=time-crossingFlashes.get(key);
+            if(age>.2)continue;
+            var flash=1-age/.2;
             var next=projectInto(a[Math.min(j+5,count-1)][0],a[Math.min(j+5,count-1)][1],a[Math.min(j+5,count-1)][2],{});
             var alongX=next.visible?next.x-p.x:1,alongY=next.visible?next.y-p.y:0;
             var alongLength=Math.hypot(alongX,alongY)||1,ux=alongX/alongLength,uy=alongY/alongLength;
             var nx=-uy,ny=ux,span=Math.min(22,Math.max(8,p.scale*1.15));
             var bolt=[];
             for(var step=0;step<=7;step++){
-              var t=step/7,jitter=(step===0||step===7)?0:Math.sin(j*12.7+step*8.3+Math.floor(time*13)*2.1)*span*.17;
+              var t=step/7,jitter=(step===0||step===7)?0:Math.sin(j*12.7+step*8.3)*span*.17;
               bolt.push([p.x+(t-.5)*span*ux+nx*jitter,p.y+(t-.5)*span*uy+ny*jitter]);
             }
             ctx.globalAlpha=.72*flash;ctx.shadowColor='#91cbff';ctx.shadowBlur=12;
@@ -1518,36 +1524,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         }
         ctx.restore();
       }
-      function drawCableLightning(ribbons,time){
-        if(scrollProgress<.015)return;
-        ctx.save();ctx.globalCompositeOperation='lighter';ctx.lineCap='round';
-        ribbons.forEach(function(line,lane){
-          var usable=line.length-2;if(usable<80)return;
-          var color=wireColors[lane],tone=rgb(mixColor(color,[235,247,255],.72));
-          for(var burst=0;burst<4;burst++){
-            var clock=reduceMotion?burst*.27:(time*(2.5+lane*.36+burst*.19)+burst*.37+lane*.23);
-            var cycle=Math.floor(clock),age=clock-cycle;
-            if(age>.58)continue;
-            var strength=Math.sin(Math.PI*age/.58);
-            var seed=cycle*13.17+burst*29.43+lane*47.31;
-            var start=8+((Math.sin(seed)*43758.5453)%1+1)%1*(usable-75);
-            var span=24+((burst*17+cycle*11+lane*7)%34),bolt=[];
-            for(var step=0;step<=13;step++){
-              var index=Math.min(usable,start+span*step/13),base=ribbonPoint(line,index);
-              var before=ribbonPoint(line,Math.max(0,index-1)),after=ribbonPoint(line,Math.min(usable,index+1));
-              var dx=after[0]-before[0],dz=after[2]-before[2],length=Math.hypot(dx,dz)||1;
-              var zig=(step===0||step===13)?0:(Math.sin(seed+step*8.37)*.13+Math.sin(seed*.7+step*3.19)*.08);
-              bolt.push([base[0]-dz/length*zig,base[1]+.13+Math.abs(zig)*.36,base[2]+dx/length*zig]);
-            }
-            ctx.shadowColor=rgb(color);ctx.shadowBlur=10;strokePath3D(bolt,rgb(color),strength*.42,3.5);
-            ctx.shadowBlur=4;strokePath3D(bolt,tone,strength*.9,1.15);
-            strokePath3D(bolt.slice(3,10),'#f5fbff',strength*.56,.52);
-            var branch=bolt[7],tip=[branch[0]+Math.sin(seed)*.35,branch[1]+.22,branch[2]+Math.cos(seed)*.35];
-            strokePath3D([bolt[5],branch,tip],tone,strength*.52,.75);
-          }
-        });
-        ctx.restore();
-      }
       function draw(){
         const i=sceneStart+scrollProgress*(route.length-1-sceneStart),head=at(i);
         currentRouteIndex=i;
@@ -1556,7 +1532,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var ribbons=lanes.map(lane=>buildRibbon(i,lane));
         var time=performance.now()/1000;
         drawInnerCurrent(ribbons,time);
-        drawCableLightning(ribbons,time);
         drawCrossingSparks(ribbons,time);
       }
       function render(time) { draw(time); }
