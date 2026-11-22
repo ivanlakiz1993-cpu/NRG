@@ -1414,7 +1414,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             var offsets=stop===stops[0]?[-.3,-.05,-3.2]:stop.kind===0?[-.3,-.05,2.9]:[-2.0,-2.1,.1];
             attachment[wireIndex]+=offsets[wireIndex]*influence;
           });
-          lateral+=weave*(1-socketInfluence*.88)+attachment[wireIndex];
+          var workshop=smoothstep((v[0]-65)/20)*(1-smoothstep((v[0]-195)/25));
+          lateral+=weave*(1-socketInfluence*.88)*(1-workshop*.78)+attachment[wireIndex];
           var vertical=lane*.055+.095*Math.cos(k*frequency*.82+phase);
           var p=[v[0]+nx*lateral,v[1]+vertical,v[2]+nz*lateral];
           line.push(p);
@@ -1492,12 +1493,25 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             if(!p.visible||p.x<0||p.x>width||p.y<0||p.y>height||!visibleAt(p.x,p.y,1/p.depth))continue;
             var flash=reduceMotion?.7:Math.max(0,Math.sin(time*19+j*.47+first*2.3));
             if(flash<.25)continue;
-            var radius=Math.min(8,Math.max(2.5,p.scale*.23))*flash;
-            ctx.globalAlpha=.7*flash;ctx.shadowColor='#a9dfff';ctx.shadowBlur=13;
-            ctx.strokeStyle='#eaf8ff';ctx.lineWidth=1.25;
-            ctx.beginPath();ctx.moveTo(p.x-radius,p.y);ctx.lineTo(p.x+radius,p.y);
-            ctx.moveTo(p.x,p.y-radius*.7);ctx.lineTo(p.x,p.y+radius*.7);ctx.stroke();
-            ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(p.x,p.y,Math.max(1,radius*.22),0,Math.PI*2);ctx.fill();
+            var next=projectInto(a[Math.min(j+5,count-1)][0],a[Math.min(j+5,count-1)][1],a[Math.min(j+5,count-1)][2],{});
+            var alongX=next.visible?next.x-p.x:1,alongY=next.visible?next.y-p.y:0;
+            var alongLength=Math.hypot(alongX,alongY)||1,ux=alongX/alongLength,uy=alongY/alongLength;
+            var nx=-uy,ny=ux,span=Math.min(22,Math.max(8,p.scale*1.15));
+            var bolt=[];
+            for(var step=0;step<=7;step++){
+              var t=step/7,jitter=(step===0||step===7)?0:Math.sin(j*12.7+step*8.3+Math.floor(time*13)*2.1)*span*.17;
+              bolt.push([p.x+(t-.5)*span*ux+nx*jitter,p.y+(t-.5)*span*uy+ny*jitter]);
+            }
+            ctx.globalAlpha=.72*flash;ctx.shadowColor='#91cbff';ctx.shadowBlur=12;
+            ctx.strokeStyle='#c5e6ff';ctx.lineWidth=2.2;
+            ctx.beginPath();ctx.moveTo(bolt[0][0],bolt[0][1]);
+            for(var step=1;step<bolt.length;step++)ctx.lineTo(bolt[step][0],bolt[step][1]);
+            ctx.stroke();
+            ctx.globalAlpha=flash;ctx.shadowBlur=3;ctx.strokeStyle='#ffffff';ctx.lineWidth=.8;ctx.stroke();
+            ctx.globalAlpha=flash*.55;ctx.strokeStyle='#a9dfff';ctx.lineWidth=.75;
+            ctx.beginPath();ctx.moveTo(bolt[3][0],bolt[3][1]);
+            ctx.lineTo(bolt[4][0]+nx*span*.23,bolt[4][1]+ny*span*.23);
+            ctx.lineTo(bolt[5][0]+nx*span*.31,bolt[5][1]+ny*span*.31);ctx.stroke();
           }
         }
         ctx.restore();
