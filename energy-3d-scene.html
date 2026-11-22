@@ -10,7 +10,7 @@
     html, body { margin: 0; min-height: 100%; background: #000000; }
     html { scrollbar-color: #777777 #000000; }
     body { overflow-x: hidden; }
-    .flight { position: relative; height: 1950svh; }
+    .flight { position: relative; height: 2350svh; }
     .screen {
       position: sticky; top: 0; width: 100%; height: 100svh; min-height: 0;
       overflow: hidden; background: #000000; isolation: isolate;
@@ -22,7 +22,7 @@
     canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
     @media (max-width: 700px) {
       .screen { min-height: 0; }
-      .flight { height: 1660svh; }
+      .flight { height: 2000svh; }
     }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
@@ -100,7 +100,10 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         [164,3,-185],[180,3,-185],[196,3,-185],[212,3,-185],[228,3,-185],
         [252,3,-185],[280,3,-185],[308,3,-185],[330,3,-185],[341,3,-185],
         [344,8,-185],[347,22,-185],[349,38,-185],[352,53,-185],
-        [363,65,-185],[378,76,-185]
+        [363,65,-185],[378,76,-185],[392,72,-185],[405,66,-187],
+        [416,62,-197],[423,61,-215],[425,61,-240],[425,61,-274],
+        [425,61,-310],[425,61,-347],[425,61,-385],[425,61,-423],
+        [425,61,-454],[425,61,-485]
       ],36);      function at(i){i=Math.max(0,Math.min(route.length-1,i));var k=Math.floor(i),a=route[k],b=route[Math.min(k+1,route.length-1)];return a.map((v,j)=>v+(b[j]-v)*(i-k))}
       var sceneStart=90;
       var originalRouteEnd=26*36;
@@ -769,6 +772,93 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         fillSurface3D(hydroPanels[0].points,hydroPanels[0].color,reveal);
         drawMovingWater(reveal);
       }
+      // The upper reservoir opens into farmland after the route turns left.
+      var uplandPanels=[
+        {points:[[371,56.35,-314],[405,56.35,-314],[414,56.35,-235],[427,56.35,-185],[430,56.35,-55],[371,56.35,-55]],color:'#11191b'},
+        {points:[[435,56.12,-205],[550,56.12,-205],[550,56.12,-550],[436,56.12,-550]],color:'#151515'},
+        {points:[[300,56.12,-319],[416,56.12,-319],[416,56.12,-550],[300,56.12,-550]],color:'#171717'}
+      ];
+      var uplandPaths=[
+        [[371,56.5,-314],[405,56.5,-314],[414,56.5,-235],[427,56.5,-185],[430,56.5,-55]],
+        [[435,56.3,-205],[436,56.3,-550]],[[416,56.3,-319],[416,56.3,-550]]
+      ];
+      var fieldHills=[];
+      for(var bank of [-1,1])for(var ridge=0;ridge<3;ridge++){
+        var near=-245-ridge*105,far=near-96,outer=bank<0?285:565,inner=bank<0?305:545;
+        fieldHills.push([[inner,56,near],[outer,66+ridge*4,near-18],[outer+(bank<0?-14:14),76+ridge*5,near-48],[outer,64+ridge*3,far+18],[inner,56,far]]);
+      }
+      var turbines=[
+        {x:469,z:-290,height:57,radius:23,phase:.15},
+        {x:381,z:-330,height:61,radius:25,phase:1.3},
+        {x:471,z:-390,height:55,radius:22,phase:2.15},
+        {x:379,z:-435,height:59,radius:24,phase:.8},
+        {x:469,z:-520,height:58,radius:23,phase:1.85}
+      ];
+      turbines.forEach(function(turbine){
+        var x=turbine.x,z=turbine.z,hub=56+turbine.height;
+        turbine.tower=[[x-2.2,56,z],[x+2.2,56,z],[x+.85,hub-2,z],[x-.85,hub-2,z]];
+        turbine.towerSide=[[x+2.2,56,z],[x+2.2,56,z-1.8],[x+.85,hub-2,z-1.8],[x+.85,hub-2,z]];
+        uplandPanels.push({points:turbine.tower,color:'#242424'},{points:turbine.towerSide,color:'#1a1a1a'});
+      });
+      var uplandDepthEntries=uplandPanels.map(p=>({building:{seed:92},face:{points:p.points},grow:1}));
+      function drawUpperWater(reveal){
+        var time=reduceMotion?0:performance.now()*.001;
+        for(var current=0;current<12;current++){
+          var z=-303+current*20.5,flow=[];
+          for(var x=374;x<=403;x+=2.9)flow.push([x,56.42,z+Math.sin(x*.32-time*.85+current)*.42]);
+          strokePath3D(flow,rgb(contourBase),reveal*(.13+(current%3)*.035),.58);
+        }
+        for(var ripple=0;ripple<42;ripple++){
+          var x=374+((ripple*11.9+time*2.2)%28),z=-307+(ripple*37.7%245);
+          var flicker=.6+.4*Math.sin(time*1.3+ripple*2.1);
+          strokePath3D([[x,56.47,z],[x+1.8+(ripple%3),56.47,z+.24]],rgb(contourGlint),reveal*flicker*.25,.55);
+        }
+      }
+      function drawTurbine(turbine,reveal,time){
+        var x=turbine.x,z=turbine.z,hub=56+turbine.height;
+        fillSurface3D(turbine.tower,'#242424',reveal);
+        fillSurface3D(turbine.towerSide,'#1a1a1a',reveal);
+        strokePath3D(turbine.tower.concat([turbine.tower[0]]),rgb(contourBase),reveal*.8,1);
+        strokePath3D([[x-2.5,hub-2,z-2],[x-2.5,hub+1,z-2],[x+3.7,hub+1,z-2],[x+3.7,hub-2,z-2],[x-2.5,hub-2,z-2]],rgb(contourBase),reveal*.7,.85);
+        var angle=time*(.28+(turbine.phase%1)*.08)+turbine.phase;
+        for(var blade=0;blade<3;blade++){
+          var a=angle+blade*Math.PI*2/3,dx=Math.cos(a),dy=Math.sin(a),nx=-dy,ny=dx;
+          function tip(distance,side){return [x+dx*distance+nx*side,hub+dy*distance+ny*side,z+1.8];}
+          var shape=[tip(1.3,-.7),tip(turbine.radius*.54,-1.7),tip(turbine.radius,-.23),tip(turbine.radius,.17),tip(turbine.radius*.55,1.05),tip(1.3,.7)];
+          fillSurface3D(shape,'#303030',reveal);
+          strokePath3D(shape.concat([shape[0]]),rgb(contourBase),reveal*.9,.95);
+          strokePath3D([tip(3,0),tip(turbine.radius*.85,-.12)],rgb(contourGlint),reveal*.33,.55);
+        }
+        var hubRing=[];
+        for(var k=0;k<=18;k++){var a=k/18*Math.PI*2;hubRing.push([x+Math.cos(a)*1.45,hub+Math.sin(a)*1.45,z+2]);}
+        fillSurface3D(hubRing.slice(0,-1),'#393939',reveal);
+        strokePath3D(hubRing,rgb(contourGlint),reveal*.92,1.25);
+      }
+      function drawUplandScene(head){
+        var reveal=smoothstep((head[0]-365)/24);
+        if(reveal<=0)return;
+        for(var panel=0;panel<3;panel++)fillSurface3D(uplandPanels[panel].points,uplandPanels[panel].color,reveal);
+        fieldHills.forEach(function(hill){fillSurface3D(hill,'#171717',reveal);strokePath3D(hill.slice(1,4),rgb(contourBase),reveal*.42,.8);});
+        uplandPaths.forEach(path=>strokePath3D(path,rgb(contourBase),reveal*.62,.9));
+        drawUpperWater(reveal);
+        for(var side of [-1,1]){
+          var parcels=side<0?[[-326,-390],[-396,-463],[-469,-545]]:[[-215,-300],[-306,-395],[-401,-545]];
+          var edge=side<0?[301,413]:[439,548];
+          parcels.forEach(function(parcel,plot){
+            strokePath3D([[edge[0],56.24,parcel[0]],[edge[1],56.24,parcel[0]]],rgb(contourBase),reveal*.28,.75);
+            for(var furrow=0;furrow<9;furrow++){
+              var x=edge[0]+7+furrow*11.5,furrowPath=[];
+              for(var z=parcel[0]-3;z>=parcel[1]+3;z-=8){
+                var drift=(z-parcel[0])*(plot%2?.045:-.035);
+                furrowPath.push([x+drift+Math.sin(z*.055+furrow*1.3)*.55,56.2,z]);
+              }
+              strokePath3D(furrowPath,rgb(contourBase),reveal*(.14+(furrow%3)*.035),.6);
+            }
+          });
+        }
+        var time=reduceMotion?0:performance.now()*.001;
+        turbines.forEach(turbine=>drawTurbine(turbine,reveal,time));
+      }
       function drawingProgress(building,head){
         if(building.final)return smoothstep((currentRouteIndex-originalRouteEnd+25)/150);
         var distance=building.routeIndex===undefined?head[2]-building.z:building.routeIndex-currentRouteIndex;
@@ -933,7 +1023,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var equipmentDepth=finalFactory.detailPanels.filter(p=>detailAmount(factoryGrow,p.stage)>.01).map(function(panel){
           return {building:finalFactory,face:{points:panel.points},grow:1};
         });
-        prepareDepth(queue.concat(equipmentDepth,head[0]>188?hydroDepthEntries:[]));
+        prepareDepth(queue.concat(equipmentDepth,head[0]>188?hydroDepthEntries:[],head[0]>350?uplandDepthEntries:[]));
         for(var pass=0;pass<2;pass++)queue.forEach(function(entry){
           var building=entry.building,face=entry.face,grow=entry.grow,leave=entry.leave,roofHeight=entry.roofHeight,fade=entry.fade;
             var points=face.points;
