@@ -92,15 +92,15 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       ];
       const route = sampleCurve([
         [0,2.8,6],[0,2.5,3],[0,2,-5],[-8,1.5,-13],stops[0].socket,
-        [-16,1.35,-21.4],[-13,1.35,-22.4],[-12,1.65,-25],[-8,2.5,-33],
+        [-19,1.35,-23],[-16,1.35,-27],[-11,1.65,-31],[-8,2.5,-34],
         [4,2,-40],[9,1.35,-46],stops[1].socket,[8,1.35,-51],
         [3,1.35,-53],[0,1.65,-55],[-2,2.1,-61],[0,2.8,-68],[-9,1.5,-76],stops[2].socket,[-12,1.35,-84],[-8,1.7,-89],[0,2.4,-99],[8,1.35,-110],stops[3].socket,[7,1.35,-118],[0,2,-126],[0,3,-143],
         [0,3,-160],[3,3,-174],[14,3,-183],[33,3,-185],[56,3,-185],[76,3,-185],[80,3,-185],
         [84,3,-185],[100,3,-185],[116,3,-185],[132,3,-185],[148,3,-185],
         [164,3,-185],[180,3,-185],[196,3,-185],[212,3,-185],[228,3,-185],
         [252,3,-185],[280,3,-185],[308,3,-185],[330,3,-185],[341,3,-185],
-        [344,8,-185],[347,22,-185],[349,38,-185],[352,53,-185],
-        [363,65,-185],[378,76,-185]
+        [349,8,-185],[352,22,-185],[355,38,-185],[358,53,-185],
+        [361,59,-185],[378,59,-185]
       ],36);      function at(i){i=Math.max(0,Math.min(route.length-1,i));var k=Math.floor(i),a=route[k],b=route[Math.min(k+1,route.length-1)];return a.map((v,j)=>v+(b[j]-v)*(i-k))}
       var sceneStart=90;
       var originalRouteEnd=26*36;
@@ -1396,6 +1396,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var wireIndex=lane+1;
         for(var k=start;k<end;k+=.65){
           var v=at(k);v[1]=Math.max(.24,v[1]-2.76);
+          if(v[0]>=340&&v[0]<=363&&v[1]>1&&v[1]<56.5)
+            v[0]=damFaceX(v[2],v[1])-.35;
           if(k<0)v[2]+=(-k)*.12;
           var turn=smoothstep((k-originalRouteEnd)/90),a=at(k-1),b=at(k+1);
           var dx=b[0]-a[0],dz=b[2]-a[2],length=Math.hypot(dx,dz)||1;
@@ -1474,13 +1476,41 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           ctx.restore();
         });
       }
+      function drawCrossingSparks(ribbons,time){
+        if(scrollProgress<.015)return;
+        ctx.save();ctx.globalCompositeOperation='lighter';ctx.lineCap='round';
+        for(var first=0;first<2;first++)for(var second=first+1;second<3;second++){
+          var a=ribbons[first],b=ribbons[second],count=Math.min(a.length,b.length);
+          for(var j=2;j<count;j++){
+            var tangent=a[j],before=a[j-2],dx=tangent[0]-before[0],dz=tangent[2]-before[2];
+            var previous=(b[j-1][0]-a[j-1][0])*dz-(b[j-1][2]-a[j-1][2])*dx;
+            var current=(b[j][0]-a[j][0])*dz-(b[j][2]-a[j][2])*dx;
+            if(previous*current>0||Math.abs(previous-current)<1e-8)continue;
+            var distance=Math.hypot(a[j][0]-b[j][0],a[j][2]-b[j][2]);
+            if(distance>1.2)continue;
+            var p=projectInto((a[j][0]+b[j][0])*.5,(a[j][1]+b[j][1])*.5+.09,(a[j][2]+b[j][2])*.5,{});
+            if(!p.visible||p.x<0||p.x>width||p.y<0||p.y>height||!visibleAt(p.x,p.y,1/p.depth))continue;
+            var flash=reduceMotion?.7:Math.max(0,Math.sin(time*19+j*.47+first*2.3));
+            if(flash<.25)continue;
+            var radius=Math.min(8,Math.max(2.5,p.scale*.23))*flash;
+            ctx.globalAlpha=.7*flash;ctx.shadowColor='#a9dfff';ctx.shadowBlur=13;
+            ctx.strokeStyle='#eaf8ff';ctx.lineWidth=1.25;
+            ctx.beginPath();ctx.moveTo(p.x-radius,p.y);ctx.lineTo(p.x+radius,p.y);
+            ctx.moveTo(p.x,p.y-radius*.7);ctx.lineTo(p.x,p.y+radius*.7);ctx.stroke();
+            ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(p.x,p.y,Math.max(1,radius*.22),0,Math.PI*2);ctx.fill();
+          }
+        }
+        ctx.restore();
+      }
       function draw(){
         const i=sceneStart+scrollProgress*(route.length-1-sceneStart),head=at(i);
         currentRouteIndex=i;
         camera(i);
         drawBackground();skyContext.drawImage(canvas,0,0);drawStreetscape(head);drawHydroScene(head);
         var ribbons=lanes.map(lane=>buildRibbon(i,lane));
-        drawInnerCurrent(ribbons,performance.now()/1000);
+        var time=performance.now()/1000;
+        drawInnerCurrent(ribbons,time);
+        drawCrossingSparks(ribbons,time);
       }
       function render(time) { draw(time); }
 
