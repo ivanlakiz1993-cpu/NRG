@@ -1566,7 +1566,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         const i=sceneStart+scrollProgress*(route.length-1-sceneStart),head=at(i);
         currentRouteIndex=i;
         camera(i);
-        drawBackground();skyContext.drawImage(canvas,0,0);drawStreetscape(head);drawHydroScene(head);
+        drawBackground();skyContext.drawImage(canvas,0,0);drawStreetscape(head);drawHydroScene(head);drawUplandScene(head);
         var ribbons=lanes.map(lane=>buildRibbon(i,lane));
         drawInnerCurrent(ribbons,performance.now()/1000);
       }
