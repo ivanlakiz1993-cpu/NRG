@@ -10,7 +10,7 @@
     html, body { margin: 0; min-height: 100%; background: #000000; }
     html { scrollbar-color: #777777 #000000; }
     body { overflow-x: hidden; }
-    .flight { position: relative; height: 1550svh; }
+    .flight { position: relative; height: 1950svh; }
     .screen {
       position: sticky; top: 0; width: 100%; height: 100svh; min-height: 0;
       overflow: hidden; background: #000000; isolation: isolate;
@@ -22,7 +22,7 @@
     canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
     @media (max-width: 700px) {
       .screen { min-height: 0; }
-      .flight { height: 1320svh; }
+      .flight { height: 1660svh; }
     }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
@@ -97,14 +97,17 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         [3,1.35,-53],[0,1.65,-55],[-2,2.1,-61],[0,2.8,-68],[-9,1.5,-76],stops[2].socket,[-12,1.35,-84],[-8,1.7,-89],[0,2.4,-99],[8,1.35,-110],stops[3].socket,[7,1.35,-118],[0,2,-126],[0,3,-143],
         [0,3,-160],[3,3,-174],[14,3,-183],[33,3,-185],[56,3,-185],[76,3,-185],[80,3,-185],
         [84,3,-185],[100,3,-185],[116,3,-185],[132,3,-185],[148,3,-185],
-        [164,3,-185],[180,3,-185],[196,3,-185],[212,3,-185],[228,3,-185]
+        [164,3,-185],[180,3,-185],[196,3,-185],[212,3,-185],[228,3,-185],
+        [252,3,-185],[280,3,-185],[308,3,-185],[330,3,-185],[341,3,-185],
+        [344,8,-185],[347,22,-185],[349,38,-185],[352,53,-185],
+        [363,65,-185],[378,76,-185]
       ],36);      function at(i){i=Math.max(0,Math.min(route.length-1,i));var k=Math.floor(i),a=route[k],b=route[Math.min(k+1,route.length-1)];return a.map((v,j)=>v+(b[j]-v)*(i-k))}
       var sceneStart=90;
       var originalRouteEnd=26*36;
       var routeDistances=[0];
       for(var distanceIndex=1;distanceIndex<route.length;distanceIndex++){
         var previous=route[distanceIndex-1],current=route[distanceIndex];
-        routeDistances.push(routeDistances[distanceIndex-1]+Math.hypot(current[0]-previous[0],current[2]-previous[2]));
+        routeDistances.push(routeDistances[distanceIndex-1]+Math.hypot(current[0]-previous[0],current[1]-previous[1],current[2]-previous[2]));
       }
       var cameraTrailDistance=32;
       function routeDistanceAt(index){
@@ -131,9 +134,11 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         cameraX+=(cameraTrackPoint[0]-cameraX)*turn;
         cameraZ+=(cameraTrackPoint[2]-cameraZ)*turn;
         cameraY+=(4.6-cameraY)*turn;
+        var ascent=smoothstep((head[1]-3)/12);
+        cameraY+=(cameraTrackPoint[1]+2-cameraY)*ascent;
         var targetX=head[0]+heading[0]*5*turn;
         var targetZ=head[2]-3*(1-turn)+heading[2]*5*turn;
-        var targetY=(head[1]+.7)*(1-turn)+1.15*turn;
+        var targetY=(head[1]+.7)*(1-turn)+(1.15+head[1]*ascent)*turn;
         cameraForward=unit([targetX-cameraX,targetY-cameraY,targetZ-cameraZ]);
         var f=cameraForward,r=cameraRight=unit([-f[2],0,f[0]]);
         cameraUp=[-r[2]*f[1],r[2]*f[0]-r[0]*f[2],r[0]*f[1]];
@@ -620,6 +625,70 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var vertices=b.faces.flatMap(f=>f.points);
         b.bounds={minX:Math.min(...vertices.map(p=>p[0])),maxX:Math.max(...vertices.map(p=>p[0])),minZ:Math.min(...vertices.map(p=>p[2])),maxZ:Math.max(...vertices.map(p=>p[2]))};
       });
+      // The river leads out of the hall to a wide hydroelectric dam.
+      var hydroPanels=[],hydroPaths=[];
+      function hydroPanel(points,color){hydroPanels.push({points:points,color:color});}
+      function hydroLine(points,weight,alpha){hydroPaths.push({points:points,weight:weight||.75,alpha:alpha===undefined?1:alpha});}
+      function damFaceX(z,y){return 349+.0013*(z+185)*(z+185)+11*y/56;}
+      hydroPanel([[186,.03,-220],[347,.03,-220],[347,.03,-150],[186,.03,-150]],'#0b0b0b');
+      for(var bank of [-1,1]){
+        var edgeZ=bank<0?-220:-150,outerZ=bank<0?-315:-55;
+        for(var reach=0;reach<8;reach++){
+          var ax=190+reach*20,bx=ax+20;
+          var rise=9+(reach%3)*2;
+          hydroPanel([[ax,0,edgeZ],[bx,0,edgeZ],[bx,rise,outerZ],[ax,rise,outerZ]],reach%2?'#151515':'#1c1c1c');
+          hydroLine([[ax,0,edgeZ],[bx,0,edgeZ]],1,.8);
+          hydroLine([[ax,rise,outerZ],[bx,rise,outerZ]],.7,.5);
+          if(reach%2===0)hydroLine([[ax,0,edgeZ],[ax+8,rise*.55,(edgeZ+outerZ)*.5],[bx,rise,outerZ]],.55,.42);
+        }
+      }
+      for(var ripple=0;ripple<16;ripple++){
+        var waterX=194+ripple*9.5,wave=[];
+        for(var step=0;step<=12;step++){
+          var waterZ=-217+step*5.3;
+          wave.push([waterX+Math.sin(step*1.3+ripple*2.1)*.48,.09,waterZ]);
+        }
+        hydroLine(wave,.5,.23+(ripple%4)*.04);
+      }
+      var damCrest=[];
+      for(var section=0;section<20;section++){
+        var z0=-315+section*13,z1=z0+13;
+        var bottom0=damFaceX(z0,0),bottom1=damFaceX(z1,0);
+        var top0=damFaceX(z0,56),top1=damFaceX(z1,56);
+        hydroPanel([[bottom0,0,z0],[bottom1,0,z1],[top1,56,z1],[top0,56,z0]],section%4===0?'#212121':'#191919');
+        hydroPanel([[top0,56,z0],[top1,56,z1],[top1+11,56,z1],[top0+11,56,z0]],'#252525');
+        if(section%2===0)hydroLine([[bottom0,0,z0],[top0,56,z0]],.65,.46);
+        damCrest.push([top0,56,z0]);
+      }
+      damCrest.push([damFaceX(-55,56),56,-55]);
+      hydroLine(damCrest,1.5,1);
+      hydroLine(damCrest.map(p=>[p[0]+3,p[1]+1.6,p[2]]),.7,.72);
+      for(var gate=0;gate<8;gate++){
+        var centreZ=-262+gate*22,leftZ=centreZ-7.5,rightZ=centreZ+7.5;
+        var gateX=damFaceX(centreZ,45)-.18;
+        hydroPanel([[gateX,42,leftZ],[gateX,42,rightZ],[gateX+2,51,rightZ],[gateX+2,51,leftZ]],'#080808');
+        hydroLine([[gateX,42,leftZ],[gateX+2,51,leftZ],[gateX+2,51,rightZ],[gateX,42,rightZ],[gateX,42,leftZ]],1,.95);
+        hydroLine([[gateX+.9,46.5,centreZ],[gateX+3,55,centreZ]],.6,.55);
+        hydroLine([[damFaceX(centreZ,3),3,centreZ],[damFaceX(centreZ,37),37,centreZ]],.45,.36);
+      }
+      // Powerhouse annex and service deck give the silhouette a clear industrial purpose.
+      hydroPanel([[346,0,-102],[346,0,-72],[346,31,-72],[346,31,-102]],'#202020');
+      hydroPanel([[346,31,-102],[346,31,-72],[365,31,-72],[365,31,-102]],'#292929');
+      hydroLine([[346,0,-102],[346,31,-102],[346,31,-72],[346,0,-72]],1.05,.92);
+      for(var windowZ=-97;windowZ<=-76;windowZ+=7)
+        hydroLine([[345.8,19,windowZ],[345.8,24,windowZ],[345.8,24,windowZ+4],[345.8,19,windowZ+4],[345.8,19,windowZ]],.7,.85);
+      for(var railZ=-305;railZ<=-65;railZ+=10)
+        hydroLine([[damFaceX(railZ,56)+3,57.6,railZ],[damFaceX(railZ,56)+3,59.2,railZ]],.55,.72);
+      var hydroDepthEntries=hydroPanels.map(p=>({building:{seed:91},face:{points:p.points},grow:1}));
+      function drawHydroScene(head){
+        var reveal=smoothstep((head[0]-188)/72);
+        if(reveal<=0)return;
+        hydroPanels.forEach(p=>fillSurface3D(p.points,p.color,reveal));
+        hydroPaths.forEach(p=>{
+          strokePath3D(p.points,rgb(contourHalo),reveal*p.alpha*.15,p.weight+1);
+          strokePath3D(p.points,rgb(contourBase),reveal*p.alpha,p.weight);
+        });
+      }
       function drawingProgress(building,head){
         if(building.final)return smoothstep((currentRouteIndex-originalRouteEnd+25)/150);
         var distance=building.routeIndex===undefined?head[2]-building.z:building.routeIndex-currentRouteIndex;
@@ -719,7 +788,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var equipmentDepth=finalFactory.detailPanels.filter(p=>detailAmount(factoryGrow,p.stage)>.01).map(function(panel){
           return {building:finalFactory,face:{points:panel.points},grow:1};
         });
-        prepareDepth(queue.concat(equipmentDepth));
+        prepareDepth(queue.concat(equipmentDepth,head[0]>188?hydroDepthEntries:[]));
         for(var pass=0;pass<2;pass++)queue.forEach(function(entry){
           var building=entry.building,face=entry.face,grow=entry.grow,leave=entry.leave,roofHeight=entry.roofHeight,fade=entry.fade;
             var points=face.points;
@@ -1162,7 +1231,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       function ribbonStart(i){
         var minimum=i-380;
         for(var k=i-88;k>minimum;k-=4){
-          var p=at(k);p[1]=.24;
+          var p=at(k);p[1]=Math.max(.24,p[1]-2.76);
           if(k<0)p[2]+=(-k)*.12;
           if(worldDepth(p)<-18)return k;
         }
@@ -1173,7 +1242,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         line.routeStart=start;line.routeStep=.65;
         var wireIndex=lane+1;
         for(var k=start;k<end;k+=.65){
-          var v=at(k);v[1]=.24;
+          var v=at(k);v[1]=Math.max(.24,v[1]-2.76);
           if(k<0)v[2]+=(-k)*.12;
           var turn=smoothstep((k-originalRouteEnd)/90),a=at(k-1),b=at(k+1);
           var dx=b[0]-a[0],dz=b[2]-a[2],length=Math.hypot(dx,dz)||1;
@@ -1298,7 +1367,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         const i=sceneStart+scrollProgress*(route.length-1-sceneStart),head=at(i);
         currentRouteIndex=i;
         camera(i);
-        drawBackground();skyContext.drawImage(canvas,0,0);drawStreetscape(head);
+        drawBackground();skyContext.drawImage(canvas,0,0);drawStreetscape(head);drawHydroScene(head);
         var ribbons=lanes.map(lane=>buildRibbon(i,lane));
         drawInnerCurrent(ribbons,performance.now()/1000);
       }
