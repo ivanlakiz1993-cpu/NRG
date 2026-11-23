@@ -770,11 +770,11 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         fillSurface3D(hydroPanels[0].points,hydroPanels[0].color,reveal);
         drawMovingWater(reveal);
       }
-      var windField=[[-130,.04,-145],[-34,.04,-145],[-34,.04,-260],[-130,.04,-260]];
+      var windField=[[25,.04,-205],[150,.04,-205],[150,.04,-315],[25,.04,-315]];
       var windTurbines=[
-        {x:-108,z:-174,height:43,radius:20,phase:.3},
-        {x:-77,z:-207,height:51,radius:24,phase:1.5},
-        {x:-47,z:-174,height:46,radius:21,phase:2.7}
+        {x:45,z:-226,height:43,radius:20,phase:.3},
+        {x:76,z:-263,height:51,radius:24,phase:1.5},
+        {x:111,z:-225,height:46,radius:21,phase:2.7}
       ];
       function drawWindField(head,time){
         var reveal=smoothstep((head[0]-30)/34)*(1-smoothstep((head[0]-105)/28));
@@ -782,12 +782,12 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         fillSurface3D(windField,'#171717',reveal);
         for(var row=0;row<11;row++){
           var furrow=[];
-          for(var x=-126;x<=-38;x+=7)furrow.push([x,.11,-153-row*9.3+Math.sin(x*.035+row*.4)*2.2]);
+          for(var x=28;x<=147;x+=8)furrow.push([x,.11,-214-row*9.1+Math.sin(x*.035+row*.4)*2.2]);
           strokePath3D(furrow,rgb(contourBase),reveal*.3,.7);
         }
         for(var ridge=0;ridge<5;ridge++){
-          var x=-128+ridge*22;
-          var bank=[[x,.05,-247],[x+11,3+ridge%2*1.4,-235],[x+22,.05,-253]];
+          var x=28+ridge*28;
+          var bank=[[x,.05,-300],[x+14,3+ridge%2*1.4,-287],[x+28,.05,-307]];
           fillSurface3D(bank,'#222222',reveal);
           strokePath3D(bank,rgb(contourBase),reveal*.45,.8);
         }
