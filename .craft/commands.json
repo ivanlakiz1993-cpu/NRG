@@ -1,0 +1,12 @@
+{
+  "commands": [
+    {
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File tests/check-scene.ps1",
+      "role": "test"
+    },
+    {
+      "command": "git diff --check",
+      "role": "check"
+    }
+  ]
+}
