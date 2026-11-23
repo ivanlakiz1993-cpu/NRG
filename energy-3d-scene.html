@@ -770,24 +770,24 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         fillSurface3D(hydroPanels[0].points,hydroPanels[0].color,reveal);
         drawMovingWater(reveal);
       }
-      var windField=[[132,.04,-205],[258,.04,-205],[258,.04,-315],[132,.04,-315]];
+      var windField=[[142,.04,-191],[207,.04,-191],[207,.04,-235],[142,.04,-235]];
       var windTurbines=[
-        {x:158,z:-229,height:43,radius:20,phase:.3},
-        {x:194,z:-263,height:51,radius:24,phase:1.5},
-        {x:232,z:-229,height:46,radius:21,phase:2.7}
+        {x:158,z:-201,height:44,radius:20,phase:.3},
+        {x:169,z:-216,height:51,radius:24,phase:1.5},
+        {x:180,z:-201,height:46,radius:21,phase:2.7}
       ];
       function drawWindField(head,time){
-        var reveal=smoothstep((head[0]-112)/24)*(1-smoothstep((head[0]-235)/28));
+        var reveal=smoothstep((head[0]-55)/22)*(1-smoothstep((head[0]-182)/26));
         if(reveal<=0)return;
         fillSurface3D(windField,'#171717',reveal);
         for(var row=0;row<11;row++){
           var furrow=[];
-          for(var x=135;x<=255;x+=8)furrow.push([x,.11,-214-row*9.1+Math.sin(x*.035+row*.4)*2.2]);
+          for(var x=145;x<=204;x+=5)furrow.push([x,.11,-194-row*3.5+Math.sin(x*.045+row*.4)*.8]);
           strokePath3D(furrow,rgb(contourBase),reveal*.3,.7);
         }
         for(var ridge=0;ridge<5;ridge++){
-          var x=134+ridge*28;
-          var bank=[[x,.05,-300],[x+14,3+ridge%2*1.4,-287],[x+28,.05,-307]];
+          var x=143+ridge*13;
+          var bank=[[x,.05,-231],[x+7,2.5+ridge%2*1.2,-225],[x+13,.05,-234]];
           fillSurface3D(bank,'#222222',reveal);
           strokePath3D(bank,rgb(contourBase),reveal*.45,.8);
         }
@@ -1571,7 +1571,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         currentRouteIndex=i;
         camera(i);
         drawBackground();skyContext.drawImage(canvas,0,0);drawStreetscape(head);drawHydroScene(head);
-        drawWindField(head,performance.now()/1000);
         drawWindField(head,performance.now()/1000);
         var ribbons=lanes.map(lane=>buildRibbon(i,lane));
         var time=performance.now()/1000;
