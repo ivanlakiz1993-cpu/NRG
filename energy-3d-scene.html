@@ -788,17 +788,17 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         drawMovingWater(reveal);
       }
       // Rolling, contour-only land and opaque ivory turbines sit to the left of the factory.
-      var windLand={centerX:0,centerZ:-329,radiusX:126,radiusZ:112};
+      var windLand={centerX:0,centerZ:-439,radiusX:126,radiusZ:112};
       var windSoil=[112,133,77],windSoilLight=[143,158,100],windTurbineIvory='#f5f0df',windTurbineShade='#d9cfb5',windTurbineEdge=[126,108,74];
       var windTurbines=[
-        {x:-8,z:-270,height:15,radius:8,phase:.3},
-        {x:25,z:-314,height:21,radius:11,phase:1.5},
-        {x:58,z:-356,height:27,radius:14,phase:2.7}
+        {x:-8,z:-380,height:15,radius:8,phase:.3},
+        {x:25,z:-424,height:21,radius:11,phase:1.5},
+        {x:58,z:-466,height:27,radius:14,phase:2.7}
       ];
       function windGroundHeight(x,z){
-        var hillA=4.8*Math.exp(-((x+42)*(x+42))/1500-((z+307)*(z+307))/2600);
-        var hillB=6.1*Math.exp(-((x-42)*(x-42))/1900-((z+357)*(z+357))/2200);
-        var hillC=2.7*Math.exp(-((x-3)*(x-3))/2500-((z+265)*(z+265))/1800);
+        var hillA=4.8*Math.exp(-((x+42)*(x+42))/1500-((z+417)*(z+417))/2600);
+        var hillB=6.1*Math.exp(-((x-42)*(x-42))/1900-((z+467)*(z+467))/2200);
+        var hillC=2.7*Math.exp(-((x-3)*(x-3))/2500-((z+375)*(z+375))/1800);
         return .2+hillA+hillB+hillC+.2*Math.sin(x*.045+z*.028);
       }
       function drawWindField(head,time){
@@ -832,7 +832,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
 
         // Closed elevation contours give each rounded hill visible 3D volume.
         var hillContours=[];
-        [[-42,-307,30,23],[42,-357,34,22],[3,-265,25,16]].forEach(function(hill,index){
+        [[-42,-417,30,23],[42,-467,34,22],[3,-375,25,16]].forEach(function(hill,index){
           for(var ring=1;ring<=2;ring++){
             var loop=[];
             for(var step=0;step<=24;step++){
