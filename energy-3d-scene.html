@@ -788,33 +788,22 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         drawMovingWater(reveal);
       }
       // Rolling, contour-only land and opaque ivory turbines sit to the left of the factory.
-      var windLand={centerX:0,centerZ:-50,radiusX:126,radiusZ:100};
+      var windLand={centerX:-55,centerZ:-329,radiusX:126,radiusZ:112};
       var windSoil=[112,133,77],windSoilLight=[143,158,100],windTurbineIvory='#f5f0df',windTurbineShade='#d9cfb5',windTurbineEdge=[126,108,74];
       var windTurbines=[
-        {x:-8,z:9,height:15,radius:8,phase:.3},
-        {x:25,z:-35,height:21,radius:11,phase:1.5},
-        {x:58,z:-77,height:27,radius:14,phase:2.7}
+        {x:-63,z:-270,height:15,radius:8,phase:.3},
+        {x:-30,z:-314,height:21,radius:11,phase:1.5},
+        {x:3,z:-356,height:27,radius:14,phase:2.7}
       ];
       function windGroundHeight(x,z){
-        var hillA=4.8*Math.exp(-((x+42)*(x+42))/1500-((z-28)*(z-28))/2600);
-        var hillB=6.1*Math.exp(-((x-42)*(x-42))/1900-((z+78)*(z+78))/2200);
-        var hillC=2.7*Math.exp(-((x-3)*(x-3))/2500-((z-14)*(z-14))/1800);
+        var hillA=4.8*Math.exp(-((x+97)*(x+97))/1500-((z+307)*(z+307))/2600);
+        var hillB=6.1*Math.exp(-((x+13)*(x+13))/1900-((z+357)*(z+357))/2200);
+        var hillC=2.7*Math.exp(-((x+52)*(x+52))/2500-((z+265)*(z+265))/1800);
         return .2+hillA+hillB+hillC+.2*Math.sin(x*.045+z*.028);
       }
       function drawWindField(head,time){
         var reveal=smoothstep((currentRouteIndex-946)/48);
         if(reveal<=0||currentRouteIndex>1190)return;
-
-        var boundary=[];
-        for(var edge=0;edge<32;edge++){
-          var angle=edge*Math.PI*2/32;
-          var uneven=1+.035*Math.sin(angle*3+.4)+.02*Math.sin(angle*7+1.1);
-          var x=windLand.centerX+Math.cos(angle)*windLand.radiusX*uneven;
-          var z=windLand.centerZ+Math.sin(angle)*windLand.radiusZ*uneven;
-          boundary.push([x,windGroundHeight(x,z),z]);
-        }
-        boundary=sampleCurve(boundary,2);boundary.push(boundary[0]);
-        strokePath3D(boundary,rgb(windSoilLight),reveal*.88,1.05);
 
         // Long, curved furrows rise and dip with the hills instead of forming a flat triangle.
         var furrows=[];
@@ -832,7 +821,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
 
         // Closed elevation contours give each rounded hill visible 3D volume.
         var hillContours=[];
-        [[-42,-28,30,23],[42,-78,34,22],[3,14,25,16]].forEach(function(hill,index){
+        [[-97,-307,30,23],[-13,-357,34,22],[-52,-265,25,16]].forEach(function(hill,index){
           for(var ring=1;ring<=2;ring++){
             var loop=[];
             for(var step=0;step<=24;step++){
