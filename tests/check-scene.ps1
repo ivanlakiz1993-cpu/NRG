@@ -24,33 +24,33 @@ $checks = @'
         check(new Set(panes).size===panes.length,'Facade sections do not share mutable windows');
         check(finalFactory.faces.every(f=>f.windows.every(w=>w.points.every(p=>p.every((v,axis)=>v>=Math.min(...f.points.map(q=>q[axis]))-.001&&v<=Math.max(...f.points.map(q=>q[axis]))+.001)))),'Every pane stays inside its own facade');
         moveTo(80);
-        check(factoryPower(124,0)===0,'Facade stays dark before energy reaches entrance');
-        check(factoryPower(133,0)===0,'Workshop stays dark before connection');
-        var hidden=projectInto(136,3.5,-204.5,{});
+        check(factoryPower(84,0)===0,'Facade stays dark before energy reaches entrance');
+        check(factoryPower(93,0)===0,'Workshop stays dark before connection');
+        var hidden=projectInto(96,3.5,-204.5,{});
         check(hidden.visible&&!visibleAt(hidden.x,hidden.y,1/hidden.depth),'Front wall occludes the left machine housing');
         captures.push({name:'approach',image:canvas.toDataURL('image/png')});
-        moveTo(140);captures.push({name:'powered-facade',image:canvas.toDataURL('image/png')});
-        moveTo(140);
-        check(factoryPower(124,0)===1&&factoryPower(224,0)===0,'Entrance powered, rear facade still dark');
+        moveTo(99);captures.push({name:'powered-facade',image:canvas.toDataURL('image/png')});
+        moveTo(115);
+        check(factoryPower(84,0)===1&&factoryPower(184,0)===0,'Entrance powered, rear facade still dark');
         captures.push({name:'entrance',image:canvas.toDataURL('image/png')});
-        moveTo(180);
-        check(factoryPower(160,0)===1&&factoryPower(205,0)===0,'Lighting follows energy through production bays');
+        moveTo(147);
+        check(factoryPower(120,0)===1&&factoryPower(165,0)===0,'Lighting follows energy through production bays');
         captures.push({name:'workshop',image:canvas.toDataURL('image/png')});
         for(var lane of [-1,0,1]){
-          var cable=buildRibbon(currentRouteIndex,lane).filter(p=>p[0]>=124&&p[0]<=224);
+          var cable=buildRibbon(currentRouteIndex,lane).filter(p=>p[0]>=84&&p[0]<=184);
           check(cable.length>0&&cable.every(p=>Math.abs(p[2]+185)<2.1&&p[1]>.05&&p[1]<.5),'Cable '+lane+' clears both portals and stays in channel');
         }
-        moveTo(260);
-        check(factoryPower(224,0)===1,'Rear facade powers after energy exits');
+        moveTo(201);
+        check(factoryPower(184,0)===1,'Rear facade powers after energy exits');
         captures.push({name:'exit',image:canvas.toDataURL('image/png')});
-        moveTo(80);check(factoryPower(124,0)===0,'Reverse scroll restores unpowered state');
+        moveTo(80);check(factoryPower(84,0)===0,'Reverse scroll restores unpowered state');
         for(var progress of [0,.2,.4,.6,1]){scrollProgress=progress;draw();}
         check(true,'Full route renders without exceptions');
-        reduceMotion=true;moveTo(180);check(factoryPower(160,0)===1,'Reduced-motion mode retains deterministic lighting');reduceMotion=false;
+        reduceMotion=true;moveTo(147);check(factoryPower(120,0)===1,'Reduced-motion mode retains deterministic lighting');reduceMotion=false;
         var begin=performance.now();for(var frame=0;frame<3;frame++)draw();
         check(true,'Stationary frame average: '+Math.round((performance.now()-begin)/3)+' ms');
-        moveTo(180);
-        if(width<700){moveTo(205);captures.push({name:'mobile-workshop',image:canvas.toDataURL('image/png')});}
+        moveTo(147);
+        if(width<700){moveTo(175);captures.push({name:'mobile-workshop',image:canvas.toDataURL('image/png')});}
       }catch(error){results.push({name:error.stack,pass:false});}
       var output=document.createElement('pre');output.id='scene-check-results';output.textContent=JSON.stringify({results:results,captures:captures});document.body.appendChild(output);
 '@
