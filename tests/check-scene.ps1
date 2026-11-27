@@ -4,7 +4,9 @@ $browser = @('C:\Program Files\Google\Chrome\Application\chrome.exe', 'C:\Progra
 if (!$browser) { throw 'Chrome or Edge is required for the browser checks.' }
 $temp = Join-Path ([IO.Path]::GetTempPath()) ('nrg-scene-' + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $temp | Out-Null
-$source = [IO.File]::ReadAllText((Join-Path $root 'energy-3d-scene.html'))
+New-Item -ItemType Directory -Path (Join-Path $temp 'assets\css') | Out-Null
+Copy-Item (Join-Path $root 'site\assets\css\site.css') (Join-Path $temp 'assets\css\site.css')
+$source = [IO.File]::ReadAllText((Join-Path $root 'site\assets\js\scene.js'))
 $checks = @'
       var viewport=location.hash.slice(1).split(',').map(Number);
       document.querySelector('.screen').style.width=viewport[0]+'px';
@@ -55,10 +57,12 @@ $checks = @'
       var output=document.createElement('pre');output.id='scene-check-results';output.textContent=JSON.stringify({results:results,captures:captures});document.body.appendChild(output);
 '@
 $source = $source.Replace('    })();', $checks + "`n    })();")
+$markup = [IO.File]::ReadAllText((Join-Path $root 'site\index.html'))
+$markup = $markup.Replace('<script defer src="assets/js/scene.js"></script>', '<script>' + $source + '</script>')
 # Capture script-level errors even if initialization fails before the test hook.
-$source = $source.Replace('<head>', '<head><script>window.onerror=function(message){document.documentElement.setAttribute("data-scene-error",message);};</script>')
+$markup = $markup.Replace('<head>', '<head><script>window.onerror=function(message){document.documentElement.setAttribute("data-scene-error",message);};</script>')
 $file = Join-Path $temp 'scene-check.html'
-[IO.File]::WriteAllText($file,$source,[Text.UTF8Encoding]::new($false))
+[IO.File]::WriteAllText($file,$markup,[Text.UTF8Encoding]::new($false))
 foreach ($size in @('1440,900','390,844')) {
   $stdout = Join-Path $temp ($size.Replace(',','-') + '.html')
   $stderr = Join-Path $temp ($size.Replace(',','-') + '.log')
