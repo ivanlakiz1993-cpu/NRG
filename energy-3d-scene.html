@@ -787,49 +787,113 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         fillSurface3D(hydroPanels[0].points,hydroPanels[0].color,reveal);
         drawMovingWater(reveal);
       }
-      // Open field outside the factory, visible before the right-hand approach.
-      var windField=[[-35,.04,-202],[78,.04,-208],[92,.04,-292],[-42,.04,-284]];
+      // Rolling, contour-only land and opaque ivory turbines sit to the left of the factory.
+      var windLand={centerX:0,centerZ:-329,radiusX:126,radiusZ:112};
+      var windSoil=[112,133,77],windSoilLight=[143,158,100],windTurbineIvory='#f5f0df',windTurbineShade='#d9cfb5',windTurbineEdge=[126,108,74];
       var windTurbines=[
-        {x:0,z:-222,height:13,radius:7,phase:.3},
-        {x:30,z:-240,height:19,radius:10,phase:1.5},
-        {x:60,z:-248,height:24,radius:12,phase:2.7}
+        {x:-8,z:-270,height:15,radius:8,phase:.3},
+        {x:25,z:-314,height:21,radius:11,phase:1.5},
+        {x:58,z:-356,height:27,radius:14,phase:2.7}
       ];
+      function windGroundHeight(x,z){
+        var hillA=4.8*Math.exp(-((x+42)*(x+42))/1500-((z+307)*(z+307))/2600);
+        var hillB=6.1*Math.exp(-((x-42)*(x-42))/1900-((z+357)*(z+357))/2200);
+        var hillC=2.7*Math.exp(-((x-3)*(x-3))/2500-((z+265)*(z+265))/1800);
+        return .2+hillA+hillB+hillC+.2*Math.sin(x*.045+z*.028);
+      }
       function drawWindField(head,time){
         var reveal=smoothstep((currentRouteIndex-946)/48);
         if(reveal<=0||currentRouteIndex>1190)return;
-        fillSurface3D(windField,'#171717',reveal);
-        strokePath3D(windField.concat([windField[0]]),rgb(contourBase),reveal*.38,.8);
-        for(var row=0;row<12;row++){
-          var furrow=[];
-          for(var x=-32;x<=80;x+=4)furrow.push([x,.12,-209-row*6+Math.sin(x*.045+row*.4)*2]);
-          strokePath3D(furrow,rgb(contourBase),reveal*.25,.7);
+
+        var boundary=[];
+        for(var edge=0;edge<32;edge++){
+          var angle=edge*Math.PI*2/32;
+          var uneven=1+.035*Math.sin(angle*3+.4)+.02*Math.sin(angle*7+1.1);
+          var x=windLand.centerX+Math.cos(angle)*windLand.radiusX*uneven;
+          var z=windLand.centerZ+Math.sin(angle)*windLand.radiusZ*uneven;
+          boundary.push([x,windGroundHeight(x,z),z]);
         }
-        for(var ridge=0;ridge<5;ridge++){
-          var x=-38+ridge*26;
-          var bank=[[x,.05,-278],[x+12,3+ridge%2*2,-270],[x+29,.05,-287]];
-          fillSurface3D(bank,'#222222',reveal);
-          strokePath3D(bank,rgb(contourBase),reveal*.4,.8);
+        boundary=sampleCurve(boundary,2);boundary.push(boundary[0]);
+        strokePath3D(boundary,rgb(windSoilLight),reveal*.88,1.05);
+
+        // Long, curved furrows rise and dip with the hills instead of forming a flat triangle.
+        var furrows=[];
+        for(var row=0;row<10;row++){
+          var across=-.78+row*.173,zBase=windLand.centerZ+across*windLand.radiusZ;
+          var halfWidth=windLand.radiusX*Math.sqrt(1-across*across)*.92,line=[];
+          for(var sample=0;sample<=26;sample++){
+            var u=sample/26,x=windLand.centerX-halfWidth+u*halfWidth*2;
+            var z=zBase+Math.sin(x*.027+row*.53)*3.2+Math.sin(x*.061-row*.31)*.8;
+            line.push([x,windGroundHeight(x,z)+.025,z]);
+          }
+          furrows.push(line);
         }
+        strokePaths3D(furrows,rgb(windSoil),reveal*.94,.82);
+
+        // Closed elevation contours give each rounded hill visible 3D volume.
+        var hillContours=[];
+        [[-42,-307,30,23],[42,-357,34,22],[3,-265,25,16]].forEach(function(hill,index){
+          for(var ring=1;ring<=2;ring++){
+            var loop=[];
+            for(var step=0;step<=24;step++){
+              var a=step*Math.PI*2/24,radius=ring/2;
+              var x=hill[0]+Math.cos(a)*hill[2]*radius;
+              var z=hill[1]+Math.sin(a)*hill[3]*radius;
+              loop.push([x,windGroundHeight(x,z)+.055,z]);
+            }
+            hillContours.push(loop);
+          }
+        });
+        strokePaths3D(hillContours,rgb(windSoilLight),reveal*.72,.72);
+
         windTurbines.forEach(function(turbine){
-          var h=turbine.height;
-          // Rotor plane faces the approaching camera, rather than edge-on.
+          var h=turbine.height,groundY=windGroundHeight(turbine.x,turbine.z),rotorY=groundY+h;
+          // Rotor plane faces the approaching camera; the tapered mast is a solid four-face shell.
           function local(side,y,depth){return [turbine.x+side*.85-depth*.527,y,turbine.z+side*.527+depth*.85];}
-          var tower=[local(-.65,.1,0),local(.65,.1,0),local(.28,h,0),local(-.28,h,0)];
-          fillSurface3D(tower,'#303030',reveal);
-          strokePath3D(tower.concat([tower[0]]),rgb(contourBase),reveal*.9,1.1);
-          var housing=[local(-.65,h-.4,0),local(.65,h-.4,0),local(.65,h+.65,0),local(-.65,h+.65,0)];
-          fillSurface3D(housing,'#383838',reveal);
-          strokePath3D(housing.concat([housing[0]]),rgb(contourBase),reveal,.9);
+          var baseWidth=.68,topWidth=.23,baseDepth=.42,topDepth=.18;
+          var base=[local(-baseWidth,groundY,-baseDepth),local(baseWidth,groundY,-baseDepth),local(baseWidth,groundY,baseDepth),local(-baseWidth,groundY,baseDepth)];
+          var top=[local(-topWidth,rotorY,-topDepth),local(topWidth,rotorY,-topDepth),local(topWidth,rotorY,topDepth),local(-topWidth,rotorY,topDepth)];
+          var mastFaces=[
+            [base[0],base[1],top[1],top[0]],
+            [base[1],base[2],top[2],top[1]],
+            [base[2],base[3],top[3],top[2]],
+            [base[3],base[0],top[0],top[3]]
+          ];
+          fillSurface3D(mastFaces[1],windTurbineShade,reveal);
+          fillSurface3D(mastFaces[2],windTurbineIvory,reveal);
+          var mastLines=[
+            [base[1],base[2],base[3]],[top[1],top[2],top[3]],
+            [base[1],top[1]],[base[2],top[2]],[base[3],top[3]]
+          ];
+          strokePaths3D(mastLines,rgb(contourBase),reveal,1.05);
+
+          // Opaque, faceted nacelle with a visible depth edge.
+          var nacelleFront=[local(-.58,rotorY-.43,.34),local(.58,rotorY-.43,.34),local(.58,rotorY+.52,.34),local(-.58,rotorY+.52,.34)];
+          var nacelleBack=[local(-.58,rotorY-.43,-.34),local(.58,rotorY-.43,-.34),local(.58,rotorY+.52,-.34),local(-.58,rotorY+.52,-.34)];
+          fillSurface3D(nacelleFront,windTurbineIvory,reveal);
+          fillSurface3D([nacelleFront[1],nacelleBack[1],nacelleBack[2],nacelleFront[2]],windTurbineShade,reveal);
+          var nacelleLines=[
+            nacelleFront.concat([nacelleFront[0]]),
+            [nacelleFront[1],nacelleBack[1],nacelleBack[2],nacelleFront[2]]
+          ];
+          strokePaths3D(nacelleLines,rgb(contourBase),reveal,1);
+
           var angle=(reduceMotion?0:time*.38)+turbine.phase;
           for(var blade=0;blade<3;blade++){
             var a=angle+blade*Math.PI*2/3,dy=Math.cos(a),ds=Math.sin(a),ny=-ds,ns=dy,r=turbine.radius;
-            var polygon=[local(ds*.45,h+dy*.45,.55),local(ds*r*.27+ns*.52,h+dy*r*.27+ny*.52,.55),local(ds*r,h+dy*r,.55),local(ds*r*.45-ns*.2,h+dy*r*.45-ny*.2,.55)];
-            fillSurface3D(polygon,'#3c3c3c',reveal);
-            strokePath3D(polygon.concat([polygon[0]]),rgb(contourGlint),reveal*.9,1);
+            var root=local(ds*.42,rotorY+dy*.42,.48);
+            var tip=local(ds*r,rotorY+dy*r,.48);
+            var edgeA=local(ds*r*.25+ns*.43,rotorY+dy*r*.25+ny*.43,.48);
+            var edgeB=local(ds*r*.49-ns*.28,rotorY+dy*r*.49-ny*.28,.48);
+            var bladeFace=[root,edgeA,tip,edgeB];
+            fillSurface3D(bladeFace,windTurbineIvory,reveal);
+            var leadingRidge=local(ds*r*.91+ns*.09,rotorY+dy*r*.91+ny*.09,.5);
+            strokePath3D(bladeFace.concat([root]),rgb(contourBase),reveal,1);
+            strokePath3D([root,leadingRidge],rgb(windTurbineEdge),reveal*.8,.72);
           }
-          var hub=[];for(var k=0;k<=16;k++){var a=k*Math.PI/8;hub.push(local(Math.cos(a)*.58,h+Math.sin(a)*.58,.6));}
-          fillSurface3D(hub.slice(0,-1),'#454545',reveal);
-          strokePath3D(hub,rgb(contourGlint),reveal,1.1);
+          var hub=[];for(var k=0;k<=20;k++){var a=k*Math.PI/10;hub.push(local(Math.cos(a)*.68,rotorY+Math.sin(a)*.68,.55));}
+          fillSurface3D(hub.slice(0,-1),windTurbineIvory,reveal);
+          strokePath3D(hub,rgb(contourBase),reveal,1.15);
         });
       }
       function drawingProgress(building,head){
