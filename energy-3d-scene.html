@@ -458,7 +458,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
                 var shade=windowRandom(lightSeed),choice=shade<.42?0:shade<.72?1:shade<.9?2:3;
                 windows.push({points:[[ax,wy,az],[bx,wy,bz],[bx,wy+wh,bz],[ax,wy+wh,az]],row:row,col:col,style:windowStyle,
                   lightColor:windowLightColors[choice],lightOpacity:.52+windowRandom(lightSeed+3.1)*.4,
-                  lightDelay:.1+windowRandom(lightSeed+8.7)*1.4,
+                  lightDelay:building.final ? .05+windowRandom(lightSeed+8.7)*.35 : .1+windowRandom(lightSeed+8.7)*1.4,
                   lightOn:building.final||windowRandom(lightSeed+12.4)>.19,
                   lightFlicker:false,lightOnset:-1});
               }
@@ -961,9 +961,10 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var centre=points.reduce((sum,p)=>sum.map((v,i)=>v+p[i]/points.length),[0,0,0]);
         return points.concat([centre]).every(function(p){var q=projectInto(...p,{});return q.visible&&visibleAt(q.x,q.y,1/q.depth);});
       }
-      function windowLightAmount(pane,power,now){
-        if(!pane.lightOn||power<.75){pane.lightOnset=-1;return 0;}
-        if(power<.88)return 0;
+      function windowLightAmount(pane,power,now,early){
+        var startThreshold=early ? .55 : .75,stableThreshold=early ? .72 : .88;
+        if(!pane.lightOn||power<startThreshold){pane.lightOnset=-1;return 0;}
+        if(power<stableThreshold)return 0;
         if(pane.lightOnset<0)pane.lightOnset=now;
         var elapsed=(now-pane.lightOnset)/1000-pane.lightDelay;
         if(reduceMotion)return pane.lightOpacity;
@@ -1061,8 +1062,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               var amount=smoothstep((grow-.5-pane.points[0][1]/roofHeight*.18)/.25);
               // Light a complete window row together so two mullioned halves never disagree.
               var paneX=pane.points.reduce((sum,p)=>sum+p[0]/pane.points.length,0);
-              var light=insideFactory?0:building.final?factoryPower(paneX,pane.row):smoothstep((building.z-head[2]+1.8-.07*pane.row)/1.2);
-              var brightness=windowLightAmount(pane,light,lightNow);
+              var light=insideFactory?0:building.final?factoryPower(paneX-5,pane.row):smoothstep((building.z-head[2]+1.8-.07*pane.row)/1.2);
+              var brightness=windowLightAmount(pane,light,lightNow,building.final);
               if(brightness>0&&amount>.95){
                 var paneAlpha=brightness*smoothstep((amount-.95)/.05)*leave;
                 if(building.final)factoryWindows.push({points:pane.points,face:face.points,color:pane.lightColor,alpha:paneAlpha});
@@ -1512,9 +1513,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           var dx=b[0]-a[0],dz=b[2]-a[2],length=Math.hypot(dx,dz)||1;
           var nx=1-turn+(-dz/length)*turn,nz=(dx/length)*turn;
           var base=[-1.55,0,1.55][wireIndex];
-          var frequency=[.032,.043,.037][wireIndex],phase=[.45,2.55,4.35][wireIndex];
-          var weave=[2.15,1.75,2.2][wireIndex]*Math.sin(k*frequency+phase)
-            +.36*Math.sin(k*frequency*.55+phase*1.6);
           var lateral=base,attachment=[0,0,0],socketInfluence=0;
           stops.forEach(function(stop){
             var distance=Math.hypot(v[0]-stop.socket[0],v[2]-stop.front);
@@ -1523,9 +1521,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             var offsets=stop===stops[0]?[-.3,-.05,-3.2]:stop.kind===0?[-.3,-.05,2.9]:[-2.0,-2.1,.1];
             attachment[wireIndex]+=offsets[wireIndex]*influence;
           });
-          var workshop=smoothstep((v[0]-18)/82)*(1-smoothstep((v[0]-195)/40));
-          lateral+=weave*(1-socketInfluence*.88)*(1-workshop*.9)+attachment[wireIndex];
-          var vertical=lane*.055+.095*Math.cos(k*frequency*.82+phase);
+          lateral+=attachment[wireIndex];
+          var vertical=lane*.055;
           var p=[v[0]+nx*lateral,v[1]+vertical,v[2]+nz*lateral];
           line.push(p);
         }
