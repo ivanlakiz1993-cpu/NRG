@@ -809,14 +809,17 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           for(var x=-80;x<=100;x+=4)furrow.push([x,.12,-210-row*6.5+Math.sin(x*.045+row*.4)*2]);
           strokePath3D(furrow,rgb(contourBase),reveal*.46,.75);
         }
-        for(var ridge=0;ridge<7;ridge++){
-          var x=-86+ridge*30;
-          var bank=[[x,.05,-278],[x+12,3+ridge%2*2,-270],[x+29,.05,-287]];
-          strokePath3D(bank,rgb(contourBase),reveal*.72,1);
-          var upperContour=[[x+3,.15,-280],[x+12,1.1+ridge%2,-274],[x+24,.15,-285]];
-          var lowerContour=[[x+6,.12,-282],[x+13,.62,-277],[x+21,.12,-284]];
-          strokePath3D(upperContour,rgb(contourBase),reveal*.4,.7);
-          strokePath3D(lowerContour,rgb(contourBase),reveal*.3,.6);
+        for(var ridge=0;ridge<6;ridge++){
+          var x=-80+ridge*32,peak=4.2+(ridge%3)*1.1;
+          var bank=sampleCurve([
+            [x,.05,-281],[x+5,.35,-276],[x+11,peak*.62,-272],
+            [x+17,peak,-270],[x+23,peak*.72,-273],[x+27,.4,-278],[x+31,.05,-285]
+          ],6);
+          strokePath3D(bank,rgb(contourBase),reveal*.82,1.05);
+          var upperContour=sampleCurve([[x+3,.15,-280],[x+9,peak*.38,-276],[x+16,peak*.63,-272],[x+23,.15,-280]],5);
+          var lowerContour=sampleCurve([[x+6,.12,-282],[x+12,peak*.2,-278],[x+18,peak*.28,-276],[x+24,.12,-283]],4);
+          strokePath3D(upperContour,rgb(contourBase),reveal*.48,.72);
+          strokePath3D(lowerContour,rgb(contourBase),reveal*.34,.62);
         }
         windTurbines.forEach(function(turbine){
           var h=turbine.height;
@@ -824,16 +827,31 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           function local(side,y,depth){return [turbine.x+side*.85-depth*.527,y,turbine.z+side*.527+depth*.85];}
           var tower=[local(-.65,.1,0),local(.65,.1,0),local(.28,h,0),local(-.28,h,0)];
           strokePath3D(tower.concat([tower[0]]),rgb(contourBase),reveal*.9,1.1);
+          strokePath3D([local(0,.2,.015),local(0,h-.25,.015)],rgb(contourBase),reveal*.58,.7);
+          for(var brace=1;brace<=5;brace++){
+            var braceY=h*brace/6,halfWidth=.65-.37*(braceY/h);
+            var braceLeft=local(-halfWidth,braceY,.02),braceRight=local(halfWidth,braceY,.02);
+            strokePath3D([braceLeft,braceRight],rgb(contourBase),reveal*.64,.68);
+            if(brace<5){
+              var nextY=h*(brace+1)/6,nextHalf=.65-.37*(nextY/h);
+              strokePath3D([braceLeft,local(nextHalf,nextY,.025)],rgb(contourBase),reveal*.4,.55);
+              strokePath3D([braceRight,local(-nextHalf,nextY,.025)],rgb(contourBase),reveal*.4,.55);
+            }
+          }
           var housing=[local(-.65,h-.4,0),local(.65,h-.4,0),local(.65,h+.65,0),local(-.65,h+.65,0)];
           strokePath3D(housing.concat([housing[0]]),rgb(contourBase),reveal,.9);
+          strokePath3D([local(-.45,h-.18,.03),local(.45,h-.18,.03)],rgb(contourBase),reveal*.58,.55);
           var angle=(reduceMotion?0:time*.38)+turbine.phase;
           for(var blade=0;blade<3;blade++){
             var a=angle+blade*Math.PI*2/3,dy=Math.cos(a),ds=Math.sin(a),ny=-ds,ns=dy,r=turbine.radius;
             var polygon=[local(ds*.45,h+dy*.45,.55),local(ds*r*.27+ns*.52,h+dy*r*.27+ny*.52,.55),local(ds*r,h+dy*r,.55),local(ds*r*.45-ns*.2,h+dy*r*.45-ny*.2,.55)];
             strokePath3D(polygon.concat([polygon[0]]),rgb(contourGlint),reveal*.9,1);
+            strokePath3D([polygon[0],polygon[2]],rgb(contourGlint),reveal*.62,.62);
+            strokePath3D([polygon[1],polygon[3]],rgb(contourBase),reveal*.42,.48);
           }
           var hub=[];for(var k=0;k<=16;k++){var a=k*Math.PI/8;hub.push(local(Math.cos(a)*.58,h+Math.sin(a)*.58,.6));}
           strokePath3D(hub,rgb(contourGlint),reveal,1.1);
+          for(var spoke=0;spoke<3;spoke++)strokePath3D([local(0,h,.62),hub[spoke*5]],rgb(contourBase),reveal*.68,.58);
         });
       }
       function drawingProgress(building,head){
