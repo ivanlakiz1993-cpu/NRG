@@ -234,17 +234,10 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         }
         return result;
       }
-      function strokePath3D(points,color,alpha,lineWidth,dash,dashOffset) {
-        if(points.length<2) return;
-        ctx.save();
-        ctx.globalAlpha=alpha;
-        ctx.strokeStyle=color;
-        ctx.lineWidth=lineWidth;
-        ctx.lineCap="round"; ctx.lineJoin="round";
-        ctx.setLineDash(dash||[]);
-        ctx.lineDashOffset=dashOffset||0;
+      function buildStrokeTrace(points) {
+        if(points.length<2)return new Path2D();
         var trace=strokeCache.get(points);
-        if(trace){ctx.stroke(trace);ctx.restore();return;}
+        if(trace)return trace;
         trace=new Path2D();strokeCache.set(points,trace);
         var open=false;
         for(var i=1;i<points.length;i++){
@@ -268,6 +261,30 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             else open=false;
           }
         }
+        return trace;
+      }
+      function strokePath3D(points,color,alpha,lineWidth,dash,dashOffset) {
+        if(points.length<2)return;
+        ctx.save();
+        ctx.globalAlpha=alpha;
+        ctx.strokeStyle=color;
+        ctx.lineWidth=lineWidth;
+        ctx.lineCap="round"; ctx.lineJoin="round";
+        ctx.setLineDash(dash||[]);
+        ctx.lineDashOffset=dashOffset||0;
+        ctx.stroke(buildStrokeTrace(points));
+        ctx.restore();
+      }
+      function strokePaths3D(paths,color,alpha,lineWidth) {
+        if(!paths.length)return;
+        var trace=new Path2D();
+        paths.forEach(function(points){if(points.length>1)trace.addPath(buildStrokeTrace(points));});
+        ctx.save();
+        ctx.globalAlpha=alpha;
+        ctx.strokeStyle=color;
+        ctx.lineWidth=lineWidth;
+        ctx.lineCap="round";ctx.lineJoin="round";
+        ctx.setLineDash([]);
         ctx.stroke(trace);
         ctx.restore();
       }
@@ -1015,6 +1032,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             }
             ctx.save();ctx.globalCompositeOperation='source-over';
             // Trace ground-level edges first, then uprights, then roof lines.
+            var buildingEdges=[];
             for(var edge=0;edge<points.length;edge++){
               if(face.skipEdges&&face.skipEdges[edge])continue;
               var adjacent=face.curvedEdges&&face.curvedEdges[edge];
@@ -1028,11 +1046,12 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               var amount=smoothstep((grow-begin)/duration);
               var path=partialPath3D([a,b],amount);
               if(path.length<2)continue;
-              strokePath3D(path,'#060606',fade*contourTransition*.3,2.5);
-              strokePath3D(path,'#f8f8f8',fade*contourTransition*.2,1.5);
-              strokePath3D(path,rgb(contourHalo),fade*.22,2.1);
-              strokePath3D(path,gradient,fade,.95);
+              buildingEdges.push(path);
             }
+            strokePaths3D(buildingEdges,'#060606',fade*contourTransition*.3,2.5);
+            strokePaths3D(buildingEdges,'#f8f8f8',fade*contourTransition*.2,1.5);
+            strokePaths3D(buildingEdges,rgb(contourHalo),fade*.22,2.1);
+            strokePaths3D(buildingEdges,gradient,fade,.95);
             face.windows.forEach(function(pane){
               var points=pane.points;
               var floor=points[0][1]/roofHeight;
@@ -1068,16 +1087,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var leave=buildingLeave(building,ahead),x=building.x,z=building.z,w=building.w,d=building.depth;
         var bounds=building.bounds,front=bounds.maxZ,paths=[];
         function detail(points,stage,weight,alpha){paths.push({points:points,stage:stage,weight:weight||.65,alpha:alpha===undefined?1:alpha})}
-        // A fine fence along the inward plot boundary, with vertical posts and two rails.
-        var fenceX=building.side<0?bounds.maxX+1.15:bounds.minX-1.15;
-        if(building.variant===2||building.variant>=6||Math.abs(building.seed)%3<1.3){
-          for(var v=front+1.6;v>=bounds.minZ-.6;v-=1.05)detail([[fenceX,0,v],[fenceX,1.1,v]],.1,.55);
-          for(var y of [.35,.95])detail([[fenceX,y,front+1.6],[fenceX,y,bounds.minZ-.6]],.2,.6);
-          // Recessed entrance gate and horizontal sign plate.
-          var gx=x-w*.32;
-          detail([[gx,0,front+1.6],[gx,1.65,front+1.6],[gx+w*.55,1.65,front+1.6],[gx+w*.55,0,front+1.6]],.35,.7);
-          detail([[gx,1.34,front+1.6],[gx+w*.55,1.34,front+1.6]],.48,.4);
-        }
         if(building.variant===2||building.variant>=6){
           // Service ladders and external pipework distinguish industrial plots.
           var lx=bounds.maxX-.75,hh=building.h*(building.variant===2?.43:building.variant===6?.34:.18)-.4;
