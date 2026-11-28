@@ -1150,12 +1150,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               frameBox(columnX-.22,columnX+.22,.1,19.7,bayZ+.22,bayZ-.22,.58,.85);
             }
           }
-          // Three cables share a shallow, protected service channel from entrance to exit.
-          for(var trayX of [-2.35,2.35]){
-            line([[trayX,.12,8],[trayX,.12,-108]],.58,1,.85);
-          }
-          // Keep the rounded facade continuous; vertical panel seams are omitted.
-          for(var y of [6.4,19.5,20])line([[-26,y,.12],[19,y,.12]],.4,.8);
           // Clear, full-height vehicle portals with both door leaves swung into the hall.
           for(var portalZ of [.2,-99.8]){
             var inward=portalZ>0?-1:1,leafEnd=portalZ+inward*5.6;
@@ -1169,17 +1163,17 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             }
             line([[-8.2,.12,portalZ],[8.2,.12,portalZ]],.7,.6);
           }
-          // Wall-mounted luminaires sit below the roof line and stay in the camera view.
+          // Suspended ceiling luminaires sit over the production floor, inside the camera view.
           building.interiorLamps=[];
           for(var lampIndex=0;lampIndex<6;lampIndex++){
-            var lampZ=-12-Math.floor(lampIndex/2)*40,lampX=lampIndex%2?21.2:-28.2;
-            var fixtureY=8.4,halfHeight=.58,halfDepth=1.25;
-            var lampPoints=[[lampX,fixtureY-halfHeight,lampZ-halfDepth],[lampX,fixtureY+halfHeight,lampZ-halfDepth],[lampX,fixtureY+halfHeight,lampZ+halfDepth],[lampX,fixtureY-halfHeight,lampZ+halfDepth]];
+            var lampZ=-16-Math.floor(lampIndex/2)*34,lampX=lampIndex%2?5:-12;
+            var fixtureY=18.4,halfWidth=.72,halfDepth=2.25;
+            var lampPoints=[[lampX-halfWidth,fixtureY,lampZ-halfDepth],[lampX+halfWidth,fixtureY,lampZ-halfDepth],[lampX+halfWidth,fixtureY,lampZ+halfDepth],[lampX-halfWidth,fixtureY,lampZ+halfDepth]];
             line(lampPoints.concat([lampPoints[0]]),.62,.78);
-            line([[lampX,fixtureY,lampZ-.42],[lampX,fixtureY,lampZ+.42]],.72,.62);
-            var wallX=lampX<0?-28.5:21.5;
-            var wall=lampX<0?[[wallX,0,-3],[wallX,19.8,-3],[wallX,19.8,-97],[wallX,0,-97]]:[[wallX,0,-97],[wallX,19.8,-97],[wallX,19.8,-3],[wallX,0,-3]];
-            building.interiorLamps.push({worldX:84-lampZ,points:lampPoints.map(worldPoint),wall:wall.map(worldPoint),lightOn:true,lightOpacity:.9,lightDelay:.08+(lampIndex%3)*.09,lightFlicker:lampIndex===2,lightOnset:-1});
+            line([[lampX-.42,20,lampZ],[lampX-.42,fixtureY,lampZ]],.62,.62);
+            line([[lampX+.42,20,lampZ],[lampX+.42,fixtureY,lampZ]],.62,.62);
+            var ceilingGlow=[[lampX-4,fixtureY,lampZ-5],[lampX+4,fixtureY,lampZ-5],[lampX+4,fixtureY,lampZ+5],[lampX-4,fixtureY,lampZ+5]];
+            building.interiorLamps.push({worldX:84-lampZ,points:lampPoints.map(worldPoint),glow:ceilingGlow.map(worldPoint),lightOn:true,lightOpacity:.9,lightDelay:.08+(lampIndex%3)*.09,lightFlicker:lampIndex===2,lightOnset:-1});
           }
           function frameBox(x0,x1,y0,y1,z0,z1,stage,weight,solid){
             var points=[[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],[x0,y0,z0],[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1],[x0,y0,z1]];
@@ -1286,36 +1280,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           }
           frameBox(15.4,17.1,1.35,2.55,-56,-58,.94,.56,'#252525');
           ring(16.25,1.9,-57,.42,.95);
-          // Two clearly recognizable manual pallet trucks parked outside the clear aisle.
-          function palletJack(cx,cz,stage){
-            function wheel(x,cy,wheelZ,r,width){
-              var near=[],far=[];
-              for(var k=0;k<=12;k++){
-                var a=k/12*Math.PI*2,y=cy+Math.cos(a)*r,z=wheelZ+Math.sin(a)*r;
-                near.push([x-width*.5,y,z]);far.push([x+width*.5,y,z]);
-              }
-              line(near,stage,.66);line(far,stage,.66);
-              for(var spoke of [0,6])line([near[spoke],far[spoke]],stage,.42);
-            }
-            // Twin tapered forks and the rear hydraulic pump form one low, solid chassis.
-            for(var forkSide of [-1,1]){
-              var forkX=cx+forkSide*.48;
-              frameBox(forkX-.15,forkX+.15,.12,.38,cz-.35,cz-3.15,stage,.64,'#000000');
-              line([[forkX-.15,.12,cz-3.15],[forkX-.1,.12,cz-3.55],[forkX+.1,.12,cz-3.55],[forkX+.15,.12,cz-3.15]],stage,.58);
-              wheel(forkX,.23,cz-3.02,.14,.18);
-            }
-            frameBox(cx-.75,cx+.75,.18,.62,cz+.12,cz-.62,stage,.6,'#000000');
-            frameBox(cx-.43,cx+.43,.48,1.05,cz+.2,cz-.48,stage,.58,'#000000');
-            wheel(cx-.55,.31,cz+.02,.28,.2);wheel(cx+.55,.31,cz+.02,.28,.2);
-            line([[cx-.55,.31,cz+.02],[cx+.55,.31,cz+.02]],stage,.55);
-            // A thick steering post and closed hand grip replace the loose single-line handle.
-            frameBox(cx-.12,cx+.12,.62,2.35,cz+.28,cz+.52,stage,.64,'#000000');
-            line([[cx-.5,2.28,cz+.58],[cx+.5,2.28,cz+.58],[cx+.5,2.68,cz+.58],[cx-.5,2.68,cz+.58],[cx-.5,2.28,cz+.58]],stage,.72);
-            line([[cx-.29,2.49,cz+.62],[cx+.29,2.49,cz+.62]],stage,.48);
-            frameBox(cx-.27,cx+.27,.65,.93,cz-.08,cz-.36,stage,.56,'#000000');
-            for(var pumpRib=0;pumpRib<3;pumpRib++)line([[cx-.19,.72+pumpRib*.07,cz-.085],[cx+.19,.72+pumpRib*.07,cz-.085]],stage,.42);
-          }
-          palletJack(-9,-67,.94);palletJack(10,-79,.96);
           // Electrical cabinets, pump skid and a smaller lathe form a second recognizable bay.
           for(var cabinet=0;cabinet<4;cabinet++){
             var cabX=19.2+cabinet*1.15,cabZ=-58-cabinet%2*2;
@@ -1435,7 +1399,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           var power=factoryPower(lamp.worldX,0)*detailAmount(grow,.72);
           var light=windowLightAmount(lamp,power,lightNow,true);
           if(light<=0)return;
-          drawWindowLight(lamp.points,[255,226,181],light,true,lamp.wall);
+          drawWindowLight(lamp.points,[255,226,181],light,true,lamp.glow);
           strokePath3D(lamp.points.concat([lamp.points[0]]),rgb([255,246,224]),light*.6,.8);
         });
       }
