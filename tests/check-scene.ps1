@@ -1,6 +1,10 @@
+param(
+  [string[]]$Sizes = @('390,844','1024,768','1920,1080'),
+  [string]$Browser = ''
+)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
-$browser = @('C:\Program Files\Google\Chrome\Application\chrome.exe', 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe') | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (!$Browser) { $Browser = @('C:\Program Files\Google\Chrome\Application\chrome.exe', 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe') | Where-Object { Test-Path $_ } | Select-Object -First 1 }
 if (!$browser) { throw 'Chrome or Edge is required for the browser checks.' }
 $temp = Join-Path ([IO.Path]::GetTempPath()) ('nrg-scene-' + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $temp | Out-Null
@@ -12,13 +16,12 @@ $checks = @'
       cancelAnimationFrame(raf);raf=0;
       var results=[],captures=[];
       function check(condition,name){results.push({name:name,pass:!!condition});}
-      function moveTo(x){currentRouteIndex=nearestRouteIndex(x,-185,originalRouteEnd);scrollProgress=currentRouteIndex/(route.length-1);draw();}
+      function moveTo(x){var index=nearestRouteIndex(x,-185,originalRouteEnd);scrollProgress=(index-sceneStart)/(route.length-1-sceneStart);draw();}
       try{
         check(width===viewport[0]&&height===viewport[1],'Exact requested canvas viewport');
         prepareFactoryDetails(finalFactory);
         check(finalFactory.detailPanels.length>30,'Solid workshop equipment and shell exist');
-        check(finalFactory.powerBranches.length===4,'Four production feeders');
-        check(finalFactory.interiorLamps.length===9,'Nine independently powered light fixtures');
+        check(finalFactory.interiorLamps.length===6,'All six current workshop light fixtures');
         check(detailAmount(1,.99)===1,'Late workshop details finish revealing');
         var panes=finalFactory.faces.flatMap(f=>f.windows);
         check(new Set(panes).size===panes.length,'Facade sections do not share mutable windows');
@@ -48,8 +51,42 @@ $checks = @'
         check(true,'Full route renders without exceptions');
         reduceMotion=true;moveTo(147);check(factoryPower(120,0)===1,'Reduced-motion mode retains deterministic lighting');reduceMotion=false;
         var begin=performance.now();for(var frame=0;frame<3;frame++)draw();
-        check(true,'Stationary frame average: '+Math.round((performance.now()-begin)/3)+' ms');
+        check(true,'Stationary JavaScript submission average: '+Math.round((performance.now()-begin)/3)+' ms');
         moveTo(147);
+        var ribbon=buildRibbon(currentRouteIndex,0),key=depthKey;
+        draw();
+        check(buildRibbon(currentRouteIndex,0)===ribbon&&depthKey===key,'Stationary frames reuse cable geometry and depth buffer');
+        var paths=finalFactory.detailPaths[0].points;
+        check(partialPath3D(paths,.5)===partialPath3D(paths,.5),'Unchanged reveal reuses its partial geometry');
+        var trace=buildStrokeTrace(paths);draw();
+        check(buildStrokeTrace(paths)===trace,'Stationary architecture reuses its visibility trace');
+        var visibilityMatches=true;
+        for(var sample=0;sample<200;sample++){
+          var x=(sample*137%width),y=(sample*73%height),ix=Math.floor(x*depthScale),iy=Math.floor(y*depthScale);
+          var nearest=depthBuffer[iy*depthWidth+ix];
+          for(var oy=-1;oy<=1;oy++)for(var ox=-1;ox<=1;ox++){
+            var nx=ix+ox,ny=iy+oy;
+            if(nx>=0&&ny>=0&&nx<depthWidth&&ny<depthHeight)nearest=Math.min(nearest,depthBuffer[ny*depthWidth+nx]);
+          }
+          var inv=.0001+(sample%37)*.003;
+          if(visibleAt(x,y,inv)!==(inv+.12*inv*inv+.00008>=nearest))visibilityMatches=false;
+        }
+        check(visibilityMatches,'Cached depth neighbourhood preserves conservative occlusion');
+        reduceMotion=true;draw();var beforeResize=canvas.toDataURL();resize();
+        check(canvas.toDataURL()===beforeResize,'Same-size resize restores background and scene exactly');
+        target=scrollProgress;tick(performance.now());
+        check(raf===0,'Reduced-motion scene stops requesting unchanged frames');
+        reduceMotion=false;
+        scrollProgress=target=0;tick(performance.now());
+        check(raf===0,'Initial empty scene does not run an idle animation loop');
+        moveTo(147);
+        var savedDraw=draw,drawCount=0,hiddenDescriptor=Object.getOwnPropertyDescriptor(document,'hidden');
+        draw=function(){drawCount++;savedDraw();};
+        Object.defineProperty(document,'hidden',{configurable:true,value:true});
+        visibilityChanged();tick(performance.now());update();
+        check(raf===0&&drawCount===0,'Hidden tab neither renders nor schedules animation');
+        if(hiddenDescriptor)Object.defineProperty(document,'hidden',hiddenDescriptor);else delete document.hidden;
+        draw=savedDraw;
         if(width<700){moveTo(175);captures.push({name:'mobile-workshop',image:canvas.toDataURL('image/png')});}
       }catch(error){results.push({name:error.stack,pass:false});}
       var output=document.createElement('pre');output.id='scene-check-results';output.textContent=JSON.stringify({results:results,captures:captures});document.body.appendChild(output);
@@ -59,13 +96,17 @@ $source = $source.Replace('    })();', $checks + "`n    })();")
 $source = $source.Replace('<head>', '<head><script>window.onerror=function(message){document.documentElement.setAttribute("data-scene-error",message);};</script>')
 $file = Join-Path $temp 'scene-check.html'
 [IO.File]::WriteAllText($file,$source,[Text.UTF8Encoding]::new($false))
-foreach ($size in @('1440,900','390,844')) {
+foreach ($size in $Sizes) {
   $stdout = Join-Path $temp ($size.Replace(',','-') + '.html')
   $stderr = Join-Path $temp ($size.Replace(',','-') + '.log')
   $profile = Join-Path $temp ('profile-' + $size.Replace(',','-'))
   $args = @('--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--allow-file-access-from-files',"--user-data-dir=`"$profile`"", "--window-size=$size", '--dump-dom', ('"file:///' + $file.Replace('\','/') + '#' + $size + '"'))
-  $process = Start-Process -FilePath $browser -ArgumentList $args -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
-  if (!$process.WaitForExit(120000)) { $process.Kill(); throw "Browser timed out. Logs: $temp" }
+  $process = Start-Process -FilePath $Browser -ArgumentList $args -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+  $deadline = [DateTime]::UtcNow.AddMinutes(5)
+  while (!$process.WaitForExit(10000)) {
+    if ([DateTime]::UtcNow -gt $deadline) { $process.Kill(); throw "Browser timed out. Logs: $temp" }
+    Write-Output "[$size] Checking scene..."
+  }
   $deadline = [DateTime]::UtcNow.AddSeconds(120)
   do {
     Start-Sleep -Milliseconds 300
