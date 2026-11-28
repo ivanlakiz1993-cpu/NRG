@@ -443,15 +443,14 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           for(var i=0;i<footprint.length;i++){
             var j=(i+1)%footprint.length,points=[bottom[i],bottom[j],top[j],top[i]],windows=[];
             var span=Math.hypot(bottom[j][0]-bottom[i][0],bottom[j][2]-bottom[i][2]);
-            if(detail&&span>.55&&!building.final){
-              var windowStyle=building.variant%4;
-              var rows=Math.max(1,Math.floor((Math.min(tops[i],tops[j])-y0-.7)/(windowStyle===3?2.7:2.1)));
+            if(detail&&span>.55){
+              var windowStyle=building.final?2:building.variant%4;
+              var rows=Math.max(1,Math.floor((Math.min(tops[i],tops[j])-y0-.7)/(building.final?4.8:windowStyle===3?2.7:2.1)));
               var cols=Math.max(1,Math.floor(span/(windowStyle===2?3.2:windowStyle===1?1.25:1.8)));
               for(var row=0;row<rows;row++)for(var col=0;col<cols;col++){
                 var inset=windowStyle===1?.34:windowStyle===2?.08:.22;
                 var t0=(col+inset)/cols,t1=(col+1-inset)/cols;
-                var wy=building.final?y0+1.6:y0+.6+row*(Math.min(tops[i],tops[j])-y0-.9)/rows;
-                var wh=building.final?Math.min(10,Math.min(tops[i],tops[j])-wy-.8):(Math.min(tops[i],tops[j])-y0-.9)/rows*(windowStyle===1?.78:windowStyle===2?.38:.57);
+                var wy=y0+.6+row*(Math.min(tops[i],tops[j])-y0-.9)/rows,wh=(Math.min(tops[i],tops[j])-y0-.9)/rows*(windowStyle===1?.78:windowStyle===2?.38:.57);
                 if(building.final&&wy<6.5)continue;
                 var ax=bottom[i][0]+(bottom[j][0]-bottom[i][0])*t0,az=bottom[i][2]+(bottom[j][2]-bottom[i][2])*t0;
                 var bx=bottom[i][0]+(bottom[j][0]-bottom[i][0])*t1,bz=bottom[i][2]+(bottom[j][2]-bottom[i][2])*t1;
@@ -634,22 +633,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           roundBox(-w*.64,w*.64,0,h*.43,0,-d,Math.min(d*.44,w*.35),true);
           roundBox(-w*.58,w*.16,h*.43,h*.86,-d*.15,-d+.4,Math.min(d*.32,w*.26),true);
           roundBox(-w*.7,w*.69,1.35,1.6,.45,-1.8,.95,false);
-        }
-        if(building.final){
-          var exitPlane=z-d;
-          faces.forEach(function(factoryFace){
-            if(!factoryFace.points.every(p=>Math.abs(p[2]-exitPlane)<1.1))return;
-            var minX=Math.min(...factoryFace.points.map(p=>p[0])),maxX=Math.max(...factoryFace.points.map(p=>p[0]));
-            var topY=Math.max(...factoryFace.points.map(p=>p[1]));
-            if(maxX-minX<8||topY<17)return;
-            factoryFace.twoSided=true;factoryFace.windows=[];
-            var cellWidth=(maxX-minX)/3,windowBottom=9.4,windowHeight=Math.min(6.2,topY-windowBottom-1.2),windowZ=factoryFace.points[0][2]+.015;
-            for(var paneIndex=0;paneIndex<3;paneIndex++){
-              var left=minX+cellWidth*(paneIndex+.1),right=minX+cellWidth*(paneIndex+.9);
-              factoryFace.windows.push({points:[[left,windowBottom,windowZ],[right,windowBottom,windowZ],[right,windowBottom+windowHeight,windowZ],[left,windowBottom+windowHeight,windowZ]],row:0,col:paneIndex,style:2,
-                lightColor:windowLightColors[paneIndex],lightOpacity:.78,lightDelay:.08,lightOn:true,lightFlicker:false,lightOnset:-1});
-            }
-          });
         }
         var litPanes=faces.flatMap(face=>face.windows).filter(pane=>pane.lightOn);
         if(litPanes.length){
@@ -1111,12 +1094,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               var a=points[edge],b=points[(edge+1)%points.length];
               var vertical=Math.abs(a[1]-b[1])>.12;
               if(vertical&&a[1]>b[1]){var swap=a;a=b;b=swap}
-              if(building.final&&vertical&&face.windows.some(function(pane){
-                var minX=Math.min(...pane.points.map(p=>p[0])),maxX=Math.max(...pane.points.map(p=>p[0]));
-                var minZ=Math.min(...pane.points.map(p=>p[2])),maxZ=Math.max(...pane.points.map(p=>p[2]));
-                var minY=Math.min(...pane.points.map(p=>p[1])),maxY=Math.max(...pane.points.map(p=>p[1]));
-                return a[0]>=minX-.02&&a[0]<=maxX+.02&&a[2]>=minZ-.02&&a[2]<=maxZ+.02&&b[1]>minY&&a[1]<maxY;
-              }))continue;
               var low=Math.min(a[1],b[1])/roofHeight;
               var begin=vertical?.13+low*.22:(low<.02?0:.4+low*.13);
               var duration=vertical?.43:(low<.02?.22:.25);
@@ -1168,16 +1145,10 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           panel([[-28.5,0,-.15],[21.5,0,-.15],[21.5,0,-99.85],[-28.5,0,-99.85]],.5,'#000000');
           panel([[-28.5,0,-3],[-28.5,19.8,-3],[-28.5,19.8,-97],[-28.5,0,-97]],.55,'#000000');
           panel([[21.5,0,-97],[21.5,19.8,-97],[21.5,19.8,-3],[21.5,0,-3]],.55,'#000000');
-          for(var bayZ of [-16,-43,-71,-98]){
-            for(var columnX of [-26.5,20]){
-              frameBox(columnX-.22,columnX+.22,.1,19.7,bayZ+.22,bayZ-.22,.58,.85);
-            }
-          }
           // Clear, full-height vehicle portals with both door leaves swung into the hall.
           for(var portalZ of [.2,-99.8]){
             var inward=portalZ>0?-1:1,leafEnd=portalZ+inward*5.6;
             line([[-8.2,0,portalZ],[-8.2,6.6,portalZ],[8.2,6.6,portalZ],[8.2,0,portalZ]],.48,1);
-            for(var hinge of [-8.2,8.2])line([[hinge,0,portalZ],[hinge,6.6,portalZ]],.48,.9);
             for(var side of [-1,1]){
               var hingeX=side*8.05,freeX=side*3.1;
               var leaf=[[hingeX,0,portalZ],[freeX,0,leafEnd],[freeX,6.35,leafEnd],[hingeX,6.35,portalZ]];
@@ -1289,13 +1260,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           frameBox(8.5,17.5,9.2,10.2,-35.2,-36.2,.9,.9,'#252525');
           frameBox(10.2,15.8,3.4,7.7,-35.4,-38,.94,.72,'#191919');
           frameBox(9,17,2.3,3.1,-37,-42,.96,.72,'#2a2a2a');
-          line([[8.2,.35,-34.5],[18,.35,-34.5]],.96,.65);
           frameBox(18.7,20.8,2,5.7,-36,-38,.98,.62,'#202020');
           line([[19,5.2,-36.05],[20.4,5.2,-36.05]],.99,.55);
-          for(var guardZ of [-34.5,-45.5]){
-            line([[7.6,.1,guardZ],[7.6,4.8,guardZ],[8.3,4.8,guardZ]],.92,.54);
-            line([[18.4,.1,guardZ],[18.4,4.8,guardZ],[17.7,4.8,guardZ]],.92,.54);
-          }
           // Enclosed transfer platform and motor housing, clear of the cable lane.
           frameBox(8.2,17.6,.55,1.35,-52,-70,.88,.64,'#1a1a1a');
           frameBox(15.4,17.1,1.35,2.55,-56,-58,.94,.56,'#252525');
