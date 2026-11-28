@@ -1035,7 +1035,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         streetscape.forEach(function(building){
           var ahead=building.routeIndex===undefined?head[2]-building.z:building.routeIndex-currentRouteIndex;
           var grow=drawingProgress(building,head),leave=buildingLeave(building,ahead);
-          if(grow<=0||leave<=0||(!building.final&&building.routeIndex===undefined&&building.z>cameraZ-4))return;
+          if((grow<=0&&!(building.final&&insideFactory))||leave<=0||(!building.final&&building.routeIndex===undefined&&building.z>cameraZ-4))return;
           active.push(building);
           var roofHeight=Math.max(...building.faces.flatMap(f=>f.points.map(p=>p[1])));
           var fade=(building.final?1:(.55+.45*(1-smoothstep((ahead-8)/62))))*Math.min(1,grow*6)*leave;
@@ -1131,7 +1131,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           var p=pane.points,mid=(a,b)=>a.map((v,i)=>(v+b[i])*.5);
           strokePath3D([mid(p[0],p[1]),mid(p[3],p[2])],rgb(contourBase),.65,.65);
         });
-        active.forEach(function(building){if(building.final)drawFactoryDetails(building,head,lightNow);});
+        active.forEach(function(building){if(building.final)drawFactoryDetails(building,head,lightNow,insideFactory);});
       }
       function prepareFactoryDetails(building){
         // Geometry is built once, before the architecture depth pass.
@@ -1167,13 +1167,13 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           building.interiorLamps=[];
           for(var lampIndex=0;lampIndex<6;lampIndex++){
             var lampZ=-16-Math.floor(lampIndex/2)*34,lampX=lampIndex%2?5:-12;
-            var fixtureY=18.4,halfWidth=.72,halfDepth=2.25;
-            var lampPoints=[[lampX-halfWidth,fixtureY,lampZ-halfDepth],[lampX+halfWidth,fixtureY,lampZ-halfDepth],[lampX+halfWidth,fixtureY,lampZ+halfDepth],[lampX-halfWidth,fixtureY,lampZ+halfDepth]];
-            line(lampPoints.concat([lampPoints[0]]),.62,.78);
-            line([[lampX-.42,20,lampZ],[lampX-.42,fixtureY,lampZ]],.62,.62);
-            line([[lampX+.42,20,lampZ],[lampX+.42,fixtureY,lampZ]],.62,.62);
-            var ceilingGlow=[[lampX-4,fixtureY,lampZ-5],[lampX+4,fixtureY,lampZ-5],[lampX+4,fixtureY,lampZ+5],[lampX-4,fixtureY,lampZ+5]];
-            building.interiorLamps.push({worldX:84-lampZ,points:lampPoints.map(worldPoint),glow:ceilingGlow.map(worldPoint),lightOn:true,lightOpacity:.9,lightDelay:.08+(lampIndex%3)*.09,lightFlicker:lampIndex===2,lightOnset:-1});
+            var fixtureY=16.2,halfWidth=.78,halfDepth=2.25;
+            frameBox(lampX-halfWidth,lampX+halfWidth,fixtureY,fixtureY+.62,lampZ+halfDepth,lampZ-halfDepth,.08,.78,'#000000');
+            line([[lampX-.44,21.45,lampZ],[lampX-.44,fixtureY+.6,lampZ]],.08,.68);
+            line([[lampX+.44,21.45,lampZ],[lampX+.44,fixtureY+.6,lampZ]],.08,.68);
+            var lampPoints=[-.28,.28].map(function(offset){var x0=lampX+offset-.16,x1=lampX+offset+.16;return [[x0,fixtureY-.015,lampZ-halfDepth+.16],[x1,fixtureY-.015,lampZ-halfDepth+.16],[x1,fixtureY-.015,lampZ+halfDepth-.16],[x0,fixtureY-.015,lampZ+halfDepth-.16]].map(worldPoint);});
+            var ceilingGlow=[[lampX-3,fixtureY-.01,lampZ-4],[lampX+3,fixtureY-.01,lampZ-4],[lampX+3,fixtureY-.01,lampZ+4],[lampX-3,fixtureY-.01,lampZ+4]];
+            building.interiorLamps.push({points:lampPoints,glow:ceilingGlow.map(worldPoint),lightOn:true,lightOpacity:.9,lightDelay:0,lightFlicker:false,lightOnset:-1});
           }
           function frameBox(x0,x1,y0,y1,z0,z1,stage,weight,solid){
             var points=[[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],[x0,y0,z0],[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1],[x0,y0,z1]];
@@ -1383,24 +1383,28 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           building.detailPanels=panels;
         }
       }
-      function drawFactoryDetails(building,head,lightNow){
-        var grow=drawingProgress(building,head);if(grow<=0)return;
-        building.detailPanels.forEach(function(item){
-          var amount=detailAmount(grow,item.stage);
-          // Subtle opaque shading separates the equipment from the black background.
-          if(amount>.01)fillSurface3D(item.points,item.color,amount);
-        });
-        building.detailPaths.forEach(function(path){
-          var points=partialPath3D(path.points,detailAmount(grow,path.stage));
-          strokePath3D(points,rgb(contourHalo),.2,2);
-          strokePath3D(points,rgb(contourBase),.82*path.alpha,path.weight);
-        });
+      function drawFactoryDetails(building,head,lightNow,insideFactory){
+        var grow=drawingProgress(building,head);
+        if(grow>0){
+          building.detailPanels.forEach(function(item){
+            var amount=detailAmount(grow,item.stage);
+            // Subtle opaque shading separates the equipment from the black background.
+            if(amount>.01)fillSurface3D(item.points,item.color,amount);
+          });
+          building.detailPaths.forEach(function(path){
+            var points=partialPath3D(path.points,detailAmount(grow,path.stage));
+            strokePath3D(points,rgb(contourHalo),.2,2);
+            strokePath3D(points,rgb(contourBase),.82*path.alpha,path.weight);
+          });
+        }
         building.interiorLamps.forEach(function(lamp){
-          var power=factoryPower(lamp.worldX,0)*detailAmount(grow,.72);
+          var power=insideFactory?1:0;
           var light=windowLightAmount(lamp,power,lightNow,true);
           if(light<=0)return;
-          drawWindowLight(lamp.points,[255,226,181],light,true,lamp.glow);
-          strokePath3D(lamp.points.concat([lamp.points[0]]),rgb([255,246,224]),light*.6,.8);
+          lamp.points.forEach(function(points){
+            drawWindowLight(points,[255,226,181],light,true,lamp.glow);
+            strokePath3D(points.concat([points[0]]),rgb([255,246,224]),light*.6,.8);
+          });
         });
       }
       var lanes=[-1,0,1];
