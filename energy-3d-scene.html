@@ -544,7 +544,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           roundBox(-42,-29,0,14,3,-18,3,true);
           roundBox(22,33,0,36,-4,-24,2.4,true);
           roundBox(-7,8,20,33,-14,-29,3.4,true);
-          roundBox(-33,26,5.8,6.2,2.3,-1,1.2,false);
           for(var stack=0;stack<2;stack++){
             var sx=-20+stack*6,foot=[];
             for(var k=0;k<24;k++){var angle=k/24*Math.PI*2;foot.push([sx+Math.cos(angle)*1.15,-22+Math.sin(angle)*1.15]);}
@@ -1147,7 +1146,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         if(!building.detailPaths){
           var paths=[],panels=[];
           function worldPoint(p){return [84-p[2],p[1],-185+p[0]];}
-          function line(points,stage,weight,alpha){if(points.every(function(point){return point[2]>.15;}))return;paths.push({points:points.map(worldPoint),stage:stage,weight:weight||.65,alpha:alpha===undefined?1:alpha});}
+          function line(points,stage,weight,alpha,keepForecourt){if(!keepForecourt&&points.every(function(point){return point[2]>.15;}))return;paths.push({points:points.map(worldPoint),stage:stage,weight:weight||.65,alpha:alpha===undefined?1:alpha});}
           function panel(points,stage,color){if(points.every(function(point){return point[2]>.15;}))return;panels.push({points:points.map(worldPoint),stage:stage,color:'#000000'});}
           function ring(x,y,z,r,stage){var points=[];for(var k=0;k<=16;k++){var angle=k/16*Math.PI*2;points.push([x+Math.cos(angle)*r,y,z+Math.sin(angle)*r]);}line(points,stage,.65);}
           // A continuous workshop shell: dark floor and inward-facing walls, with an open drive-through aisle.
@@ -1329,6 +1328,21 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             var pipe=[[28,y,6.3],[37,y,6.3]];
             for(var k=1;k<=12;k++){var angle=k/12*Math.PI/2;pipe.push([37+2*Math.sin(angle),y,4.3+2*Math.cos(angle)]);}
             pipe.push([39,y,-5.5]);line(pipe,.65,.8);
+          }
+          // Central guardrail above the clear vehicle opening; no shelf underneath.
+          for(var railY of [6.4,6.75,7.1])line([[-6,railY,6.3],[6,railY,6.3]],.6,.85,undefined,true);
+          for(var railX=-6;railX<=6;railX+=2)line([[railX,6.3,6.3],[railX,7.1,6.3]],.68,.45,undefined,true);
+          // Restore vessel access ladders and roof safety rails around both tanks.
+          for(var tank=0;tank<2;tank++){
+            var tankX=39+tank*9,tankTop=11+tank*2;
+            for(var tankY of [.4,tankTop*.4,tankTop*.75,tankTop])ring(tankX,tankY,-9,3.44,.6);
+            ring(tankX,tankTop+1.05,-9,3.2,.7);
+            for(var railPost=0;railPost<12;railPost++){
+              var railAngle=railPost/12*Math.PI*2;
+              line([[tankX+Math.cos(railAngle)*3.2,tankTop,-9+Math.sin(railAngle)*3.2],[tankX+Math.cos(railAngle)*3.2,tankTop+1.05,-9+Math.sin(railAngle)*3.2]],.7,.45);
+            }
+            for(var ladderSide of [-.22,.22])line([[tankX+ladderSide,0,-5.52],[tankX+ladderSide,tankTop+1.05,-5.52]],.55,.55);
+            for(var rungY=.4;rungY<tankTop+.8;rungY+=.45)line([[tankX-.22,rungY,-5.5],[tankX+.22,rungY,-5.5]],.7,.4);
           }
           // Silo seams and roof guards, with a common transfer conveyor behind the vessels.
           for(var sx of [-30,-22,-14]){
