@@ -14,7 +14,10 @@ the entrance, workshop, exit, river, canyon, dam outlets, ascent and crest at
 clearance of the central ascent, visible outlet jets, flowing water at a stationary
 camera, reverse travel and a stable reduced-motion state.
 The final-map checks also verify the local Figma SVG, original region IDs and
-aspect ratio, the three cable endpoints, complete cable absorption, the stopped
+aspect ratio and maximum viewport fit without cropping, a brief level advance
+after the ascent, delayed compact panel lamps,
+the three cable endpoints, persistent blue/indigo/green contour illumination,
+complete cable absorption, the stopped
 animation loop at the final frame and isolated region illumination. A temporary
 region selection is used only inside the test, then cleared. The production
 `mapRegionSelection` array in `energy-3d-scene.html` stays empty until regions are

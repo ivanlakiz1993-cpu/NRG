@@ -150,10 +150,14 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         [252,3,-185],[280,3,-185],[308,3,-185],[330,3,-185],[341,3,-185],
         [349,8,-185],[352,22,-185],[355,38,-185],[358,53,-185],
         [361,59,-185],[378,59,-185]
-      ],36);      function at(i){i=Math.max(0,Math.min(route.length-1,i));var k=Math.floor(i),a=route[k],b=route[Math.min(k+1,route.length-1)];return a.map((v,j)=>v+(b[j]-v)*(i-k))}
+      ],36);
+      var mapRiseEnd=route.length-1;
+      // A short, level advance beyond the crest precedes the control-panel lamps.
+      route.push(...sampleCurve([[378,59,-185],[386,59,-185],[394,59,-185]],12).slice(1));
+      function at(i){i=Math.max(0,Math.min(route.length-1,i));var k=Math.floor(i),a=route[k],b=route[Math.min(k+1,route.length-1)];return a.map((v,j)=>v+(b[j]-v)*(i-k))}
       var sceneStart=90;
       var originalRouteEnd=26*36;
-      var routeEnd=route.length-1,journeyEnd=routeEnd+300;
+      var routeEnd=route.length-1,journeyEnd=routeEnd+80;
       function sceneProgressAt(index){return (index-sceneStart)/(journeyEnd-sceneStart);}
       var routeDistances=[0];
       for(var distanceIndex=1;distanceIndex<route.length;distanceIndex++){
@@ -191,6 +195,17 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var targetX=head[0]+heading[0]*5*turn;
         var targetZ=head[2]-3*(1-turn)+heading[2]*5*turn;
         var targetY=(head[1]+.7)*(1-turn)+(1.15+head[1]*ascent)*turn;
+        if(i>mapRiseEnd){
+          // Raise the gaze during the short level advance. The cable tips approach
+          // the panel lamps from below rather than overshooting and bending back.
+          var departure=smoothstep((i-mapRiseEnd)/16),layout=mapLayout();
+          var tipY=head[1]-2.76+.95*smoothstep((head[0]-356)/12);
+          var tipDistance=Math.hypot(head[0]-cameraX,head[2]-cameraZ);
+          var screenSlope=(height*.51-layout.indicatorY-height*.035)/focal;
+          var pitch=Math.atan2(tipY-cameraY,tipDistance)-Math.atan(screenSlope);
+          var panelTargetY=cameraY+Math.hypot(targetX-cameraX,targetZ-cameraZ)*Math.tan(pitch);
+          targetY+=(panelTargetY-targetY)*departure;
+        }
         cameraForward=unit([targetX-cameraX,targetY-cameraY,targetZ-cameraZ]);
         var f=cameraForward,r=cameraRight=unit([-f[2],0,f[0]]);
         cameraUp=[-r[2]*f[1],r[2]*f[0]-r[0]*f[2],r[0]*f[1]];
@@ -1856,7 +1871,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       // original Figma SVG groups, e.g. {id:'RU-MOW',lane:0}. No demo regions are enabled.
       var mapRegionSelection=[];
       var mapImage=new Image(),mapDocument=null,mapLoaded=false,mapLoadError=false;
-      var mapLayers=[],mapLayerKey='',mapRegionImages=[],mapSweep=document.createElement('canvas');
+      var mapLayers=[],mapLayerKey='',mapRegionImages=[],mapPoweredLayer=null;
       var mapReady=Promise.all([
         new Promise(function(resolve){
           mapImage.onload=function(){mapLoaded=true;mapLayerKey='';resolve(true);if(typeof update==='function')update();};
@@ -1896,23 +1911,26 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         }));
       }
       function mapFinaleState(index){
+        var power=smoothstep((index-routeEnd)/8);
         return {
-          reveal:smoothstep((index-routeEnd+70)/100),
-          handoff:smoothstep((index-routeEnd+65)/100),
-          darkness:smoothstep((index-routeEnd+55)/90),
-          absorb:smoothstep((index-routeEnd-45)/185),
-          charge:smoothstep((index-routeEnd-20)/155),
-          power:smoothstep((index-routeEnd-105)/175)
+          reveal:smoothstep((index-mapRiseEnd+30)/30),
+          handoff:smoothstep((index-mapRiseEnd-16)/8),
+          darkness:smoothstep((index-mapRiseEnd)/12),
+          lamps:smoothstep((index-mapRiseEnd-14)/6),
+          absorb:smoothstep((index-routeEnd-2)/45),
+          charge:power,
+          power:power
         };
       }
       function mapLayout(){
-        var w=Math.min(width*(width<700?.90:.72),1177,height*.64*1177/731.722),h=w*731.722/1177;
-        var x=(width-w)*.5,y=height*.40-h*.5;
-        var gap=Math.min(75,Math.max(30,height*.07)),spacing=Math.min(150,width*.13);
-        return {x:x,y:y,w:w,h:h,indicatorY:y+h+gap,spacing:spacing,radius:Math.min(18,Math.max(9,width*.015))};
+        // Contain the complete SVG in the viewport with only a slim safety margin.
+        var w=Math.min(width*.98,height*.96*1177/731.722),h=w*731.722/1177;
+        var x=(width-w)*.5,y=(height-h)*.5;
+        var gap=Math.max(22,height*.035),radius=Math.min(14,Math.max(8,width*.012));
+        return {x:x,y:y,w:w,h:h,indicatorY:Math.min(height*.91,y+h+gap),spacing:radius*2.7,radius:radius};
       }
       function mapRaster(source,color,layout){
-        var layer=document.createElement('canvas'),scale=Math.min(dpr,1.5);
+        var layer=document.createElement('canvas'),scale=dpr;
         layer.width=Math.ceil(layout.w*scale);layer.height=Math.ceil(layout.h*scale);
         var context=layer.getContext('2d');
         context.drawImage(source,0,0,layer.width,layer.height);
@@ -1932,8 +1950,14 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         if(key===mapLayerKey||!mapLoaded)return;
         mapLayerKey=key;
         mapLayers=[mapRaster(mapImage,[211,220,229],layout)];
-        mapSweep.width=mapLayers[0].width;mapSweep.height=mapLayers[0].height;
-        for(var color of wireColors)mapLayers.push(mapRaster(mapImage,mixColor(color,[235,250,255],.35),layout));
+        mapPoweredLayer=document.createElement('canvas');
+        mapPoweredLayer.width=mapLayers[0].width;mapPoweredLayer.height=mapLayers[0].height;
+        var light=mapPoweredLayer.getContext('2d');light.drawImage(mapLayers[0],0,0);
+        light.globalCompositeOperation='source-in';
+        var spectrum=light.createLinearGradient(0,mapPoweredLayer.height*.8,mapPoweredLayer.width,mapPoweredLayer.height*.2);
+        for(var stop of [[0,0],[.28,0],[.52,1],[.76,2],[1,2]])
+          spectrum.addColorStop(stop[0],rgb(mixColor(wireColors[stop[1]],[230,249,255],.24)));
+        light.fillStyle=spectrum;light.fillRect(0,0,mapPoweredLayer.width,mapPoweredLayer.height);
         mapRegionImages.forEach(function(region){region.layer=mapRaster(region.image,mixColor(wireColors[region.lane],[235,250,255],.52),layout);});
       }
       function strokeScreenPath(points,color,alpha,lineWidth){
@@ -1968,28 +1992,17 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         if(!mapLoaded)return;
         prepareMapLayers(layout);
         ctx.save();ctx.globalCompositeOperation='lighter';
-        ctx.globalAlpha=state.reveal*(.14+.72*state.power);
+        // The unpowered map is already legible; connection adds the wire colours.
+        ctx.globalAlpha=state.reveal*(.86-.44*state.power);
         ctx.drawImage(mapLayers[0],layout.x,layout.y,layout.w,layout.h);
-        // A single rising wave carries the three currents through the real SVG contours.
-        // The sweep is scroll-driven and settles; it never loops or flashes at rest.
-        if(state.power>0&&state.power<1){
-          for(var lane=0;lane<3;lane++){
-            var wave=layout.y+layout.h*(1.16-state.power*1.42)+lane*layout.h*.045;
-            var band=layout.h*.10,mask=mapSweep.getContext('2d'),scale=mapSweep.height/layout.h;
-            mask.globalCompositeOperation='source-over';mask.clearRect(0,0,mapSweep.width,mapSweep.height);
-            mask.drawImage(mapLayers[lane+1],0,0);
-            var gradient=mask.createLinearGradient(0,(wave-band-layout.y)*scale,0,(wave+band-layout.y)*scale);
-            gradient.addColorStop(0,'rgba(0,0,0,0)');gradient.addColorStop(.5,'rgba(255,255,255,.9)');gradient.addColorStop(1,'rgba(0,0,0,0)');
-            // Use an alpha mask on the cached contour image, never draw a stripe over the map.
-            mask.globalCompositeOperation='destination-in';mask.fillStyle=gradient;mask.fillRect(0,0,mapSweep.width,mapSweep.height);
-            ctx.save();
-            ctx.globalAlpha=Math.sin(state.power*Math.PI)*.65;
-            ctx.shadowColor=rgb(wireColors[lane]);ctx.shadowBlur=10;
-            ctx.drawImage(mapSweep,layout.x,layout.y,layout.w,layout.h);ctx.restore();
-          }
+        if(state.power>0){
+          ctx.save();ctx.globalAlpha=state.power*.18;ctx.shadowColor='#5faaca';ctx.shadowBlur=7;
+          ctx.drawImage(mapPoweredLayer,layout.x,layout.y,layout.w,layout.h);
+          ctx.shadowBlur=0;ctx.globalAlpha=state.power*.95;
+          ctx.drawImage(mapPoweredLayer,layout.x,layout.y,layout.w,layout.h);ctx.restore();
         }
-        mapRegionImages.forEach(function(region,index){
-          var power=smoothstep((state.power-Math.min(.35,index*.035))/.65);
+        mapRegionImages.forEach(function(region){
+          var power=state.power;
           if(!region.layer||power<=0)return;
           ctx.save();ctx.globalAlpha=power*.38;ctx.shadowColor=rgb(wireColors[region.lane]);ctx.shadowBlur=12;
           ctx.drawImage(region.layer,layout.x,layout.y,layout.w,layout.h);
@@ -1998,17 +2011,27 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         ctx.restore();
       }
       function drawMapIndicators(state,layout){
+        if(state.lamps<=0)return;
         for(var lane=0;lane<3;lane++){
           var x=width*.5+(lane-1)*layout.spacing,y=layout.indicatorY,r=layout.radius;
-          var color=mixColor(wireColors[lane],[220,245,255],.28),power=state.charge;
-          ctx.save();ctx.globalAlpha=state.reveal;ctx.fillStyle='#000';
+          var color=wireColors[lane],power=state.charge;
+          ctx.save();ctx.globalAlpha=state.lamps;ctx.fillStyle='#020304';
           ctx.beginPath();ctx.arc(x,y,r+2,0,Math.PI*2);ctx.fill();
-          ctx.lineWidth=1;ctx.strokeStyle=rgb(mixColor([50,56,66],color,power));ctx.stroke();
-          ctx.beginPath();ctx.arc(x,y,r*.56,0,Math.PI*2);
-          ctx.globalAlpha=state.reveal*(.18+.82*power);ctx.fillStyle=rgb(color);
-          ctx.shadowColor=rgb(color);ctx.shadowBlur=power*19;ctx.fill();
-          ctx.shadowBlur=0;ctx.globalAlpha=state.reveal*(.25+.75*power);ctx.strokeStyle=rgb(mixColor(color,[255,255,255],.6));ctx.lineWidth=.8;
-          ctx.beginPath();ctx.arc(x,y,r*.78,-Math.PI*.85,Math.PI*.85);ctx.stroke();ctx.restore();
+          // Recessed pilot light: brushed metal bezel and a convex coloured lens.
+          var metal=ctx.createLinearGradient(x-r,y-r,x+r,y+r);
+          for(var stop of [[0,'#879098'],[.18,'#394249'],[.48,'#12181d'],[.72,'#5f6870'],[1,'#262f36']])metal.addColorStop(...stop);
+          ctx.fillStyle=metal;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+          ctx.strokeStyle='#77818a';ctx.lineWidth=.6;ctx.stroke();
+          ctx.fillStyle='#05080b';ctx.beginPath();ctx.arc(x,y,r*.81,0,Math.PI*2);ctx.fill();
+          var lens=ctx.createRadialGradient(x-r*.23,y-r*.27,r*.04,x,y,r*.73);
+          lens.addColorStop(0,rgb(mixColor([16,28,38],mixColor(color,[225,250,255],.7),.08+power*.92)));
+          lens.addColorStop(.42,rgb(mixColor([7,12,19],color,.18+power*.82)));
+          lens.addColorStop(1,rgb(mixColor([2,5,9],color,.04+power*.23)));
+          ctx.fillStyle=lens;ctx.shadowColor=rgb(color);ctx.shadowBlur=power*17;
+          ctx.beginPath();ctx.arc(x,y,r*.72,0,Math.PI*2);ctx.fill();
+          ctx.shadowBlur=0;ctx.strokeStyle=rgb(mixColor(color,[228,248,255],.35),.3+power*.35);ctx.lineWidth=.65;ctx.stroke();
+          ctx.strokeStyle='rgba(240,249,255,.34)';ctx.lineWidth=Math.max(.6,r*.065);
+          ctx.beginPath();ctx.arc(x-r*.04,y-r*.01,r*.53,-Math.PI*.84,-Math.PI*.38);ctx.stroke();ctx.restore();
         }
       }
       function draw(){
@@ -2028,7 +2051,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         if(finale.reveal>0){
           ctx.save();ctx.globalAlpha=finale.darkness;ctx.fillStyle='#000';ctx.fillRect(0,0,width,height);ctx.restore();
           var layout=mapLayout();drawMapContours(finale,layout);
-          drawInnerCurrent(mapCables(ribbons,finale,layout),time,true);
+          if(finale.handoff>0)drawInnerCurrent(mapCables(ribbons,finale,layout),time,true);
+          else drawInnerCurrent(ribbons,time);
           drawMapIndicators(finale,layout);
         }else{
           drawInnerCurrent(ribbons,time);drawCrossingSparks(ribbons,time);
