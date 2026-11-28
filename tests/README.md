@@ -9,7 +9,10 @@ powershell -ExecutionPolicy Bypass -File tests/compare-scene.ps1
 
 `check-scene.ps1` checks the current geometry, light sequencing, reverse scrolling,
 occlusion, cache invalidation on resize and animation scheduling. It captures
-the entrance, workshop and exit at 390, 1024 and 1920 CSS pixels.
+the entrance, workshop, exit, river, canyon, dam outlets, ascent and crest at
+390, 1024 and 1920 CSS pixels. Canyon checks cover solid dam occlusion,
+clearance of the central ascent, visible outlet jets, flowing water at a stationary
+camera, reverse travel and a stable reduced-motion state.
 
 `compare-scene.ps1` loads the original scene from Git (`86e1636` by default),
 renders both versions with an identical clock, and compares 15 frames per

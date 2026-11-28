@@ -779,7 +779,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       });
       // The river leads out of the hall to a wide hydroelectric dam.
       var hydroPanels=[],hydroPaths=[];
-      function hydroPanel(points,color){hydroPanels.push({points:points,color:'#000000'});}
+      function hydroPanel(points){hydroPanels.push({points:points,color:'#000000'});}
       function hydroLine(points,weight,alpha){hydroPaths.push({points:points,weight:weight||.75,alpha:alpha===undefined?1:alpha});}
       function damFaceX(z,y){return 349+.0013*(z+185)*(z+185)+11*y/56;}
       function damFront(z,y,offset){return [damFaceX(z,y)-(offset||0),y,z];}
@@ -788,54 +788,139 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         {x:[190,208,225,249,266,287,305,329,346],shelf:[5,6.9,6.2,8.1,7,9.3,8,9.5,10.2],ridge:[24,30,27,35,29,37,33,40,41],ledge:[6,9,5,8,7,10,6,8,7],crest:[19,24,20,27,22,25,18,26,21]},
         {x:[190,212,228,244,269,284,309,327,346],shelf:[6,7.3,6,8.7,7.8,8.3,9.6,8.5,11],ridge:[27,25,33,30,38,32,40,35,42],ledge:[7,5,9,6,10,7,8,5,9],crest:[22,18,26,21,29,20,27,19,25]}
       ];
-      var lowerRockShades=['#161616','#1b1b1b','#181818','#1e1e1e','#171717'];
-      var upperRockShades=['#222222','#292929','#1f1f1f','#262626','#242424'];
+      function riverEdge(bank,x){
+        return (bank<0?-220:-150)+bank*(Math.sin((x-190)*.064)*2.1+Math.sin((x-190)*.143)*.85);
+      }
+      function rockSurface(bank,column,level){
+        var profile=bankProfiles[bank<0?0:1],reach=Math.min(7,Math.floor(column/4)),t=column/4-reach;
+        function sample(values){return values[reach]+(values[reach+1]-values[reach])*t;}
+        var x=sample(profile.x),shelf=sample(profile.shelf),ridge=sample(profile.ridge);
+        var ledge=sample(profile.ledge),crest=sample(profile.crest),y,out;
+        if(level<.25){y=shelf*level/.25;out=ledge*level/.25;}
+        else if(level<.83){var rise=(level-.25)/.58;y=shelf+(ridge-shelf)*rise;out=ledge+(crest-ledge)*rise;}
+        else{var rise=(level-.83)/.17;y=ridge+6*rise;out=crest+23*rise;}
+        // Shared mesh vertices give each fracture real relief and keep adjacent strata watertight.
+        var relief=Math.sin(column*1.91+level*17+bank)*Math.sin(level*Math.PI)*1.8;
+        return [x+Math.sin(level*19+column*.7)*Math.sin(level*Math.PI)*.65,
+          y+Math.sin(column*1.3+level*11)*Math.sin(level*Math.PI)*.85,
+          riverEdge(bank,x)+bank*(out+relief)];
+      }
+      function rockOutline(p,bank){return [p[0]-.025,p[1]+.025,p[2]-bank*.055];}
+      function rockMeshPoint(mesh,column,row,bank){
+        var c=Math.min(31,Math.max(0,Math.floor(column))),r=Math.min(6,Math.max(0,Math.floor(row)));
+        var u=column-c,v=row-r,a=mesh[r][c],b=mesh[r][c+1],d=mesh[r+1][c],e=mesh[r+1][c+1],p;
+        // Barycentric sampling keeps fine fissures on the actual triangles, including folds.
+        if((c+r)%2){
+          p=u+v<=1?a.map((n,k)=>n+(b[k]-n)*u+(d[k]-n)*v):e.map((n,k)=>n+(d[k]-n)*(1-u)+(b[k]-n)*(1-v));
+        }else{
+          p=u>=v?a.map((n,k)=>n+(b[k]-n)*(u-v)+(e[k]-n)*v):a.map((n,k)=>n+(e[k]-n)*u+(d[k]-n)*(v-u));
+        }
+        return rockOutline(p,bank);
+      }
+      var shoreRocks=[];
       for(var bank of [-1,1]){
-        var edgeZ=bank<0?-220:-150,profile=bankProfiles[bank<0?0:1];
-        for(var reach=0;reach<8;reach++){
-          var ax=profile.x[reach],bx=profile.x[reach+1],tone=(reach*3+(bank>0?2:0))%5;
-          var edgeA=[ax,0,edgeZ],edgeB=[bx,0,edgeZ];
-          var shelfA=[ax,profile.shelf[reach],edgeZ+bank*profile.ledge[reach]];
-          var shelfB=[bx,profile.shelf[reach+1],edgeZ+bank*profile.ledge[reach+1]];
-          var ridgeA=[ax,profile.ridge[reach],edgeZ+bank*profile.crest[reach]];
-          var ridgeB=[bx,profile.ridge[reach+1],edgeZ+bank*profile.crest[reach+1]];
-          var topA=[ax,ridgeA[1]+6,ridgeA[2]+bank*23],topB=[bx,ridgeB[1]+6,ridgeB[2]+bank*23];
-          if(reach%2){
-            hydroPanel([edgeA,edgeB,shelfA],lowerRockShades[tone]);
-            hydroPanel([edgeB,shelfB,shelfA],lowerRockShades[(tone+2)%5]);
-            hydroPanel([shelfA,shelfB,ridgeA],upperRockShades[tone]);
-            hydroPanel([shelfB,ridgeB,ridgeA],upperRockShades[(tone+3)%5]);
-          }else{
-            hydroPanel([edgeA,edgeB,shelfB],lowerRockShades[tone]);
-            hydroPanel([edgeA,shelfB,shelfA],lowerRockShades[(tone+2)%5]);
-            hydroPanel([shelfA,shelfB,ridgeB],upperRockShades[tone]);
-            hydroPanel([shelfA,ridgeB,ridgeA],upperRockShades[(tone+3)%5]);
+        var levels=[0,.12,.25,.38,.52,.67,.83,1],mesh=[];
+        for(var row=0;row<levels.length;row++){
+          var strip=[];
+          for(var col=0;col<=32;col++)strip.push(rockSurface(bank,col,levels[row]));
+          mesh.push(strip);
+        }
+        for(var row=0;row<levels.length-1;row++)for(var col=0;col<32;col++){
+          var a=mesh[row][col],b=mesh[row][col+1],c=mesh[row+1][col+1],d=mesh[row+1][col];
+          // Triangulated, irregular strata rather than a single flat canyon wall.
+          if((col+row)%2){hydroPanel([a,b,d]);hydroPanel([b,c,d]);}
+          else{hydroPanel([a,b,c]);hydroPanel([a,c,d]);}
+        }
+        for(var row=0;row<levels.length;row++){
+          hydroLine(mesh[row].map(p=>rockOutline(p,bank)),row===0?1:.65,row===0?.72:row===6?.57:.29);
+          // Short mineral seams follow the same faceted surface, with natural gaps.
+          if(row>0&&row<6)for(var col=1;col<31;col+=5){
+            var seam=[];
+            for(var j=col;j<=col+2;j++){
+              var p=mesh[row][j],q=mesh[row+1][j];
+              seam.push(rockOutline(p.map((v,k)=>v+(q[k]-v)*.2),bank));
+            }
+            hydroLine(seam,.45,.21);
           }
-          hydroPanel([ridgeA,ridgeB,topB,topA],upperRockShades[(tone+1)%5]);
-          hydroLine([edgeA,[(ax+bx)*.5,.18,edgeZ+bank*1.1],edgeB],1,.78);
-          hydroLine([shelfA,shelfB],.7,.63);
-          hydroLine([ridgeA,ridgeB],.9,.7);
-          var crack=(.22+((reach*7+(bank>0?2:0))%5)*.13);
-          function between(a,b,t){return a.map((v,i)=>v+(b[i]-v)*t);}
-          hydroLine([between(topA,topB,crack),between(ridgeA,ridgeB,crack),between(shelfA,shelfB,crack),between(edgeA,edgeB,crack)].map(p=>[p[0]-.25,p[1],p[2]]),.7,.68);
-          var second=(reach+bank+8)%3===0?.82:.31;
-          hydroLine([between(ridgeA,ridgeB,second),between(shelfA,shelfB,Math.max(.08,second-.13)),between(edgeA,edgeB,Math.max(.08,second-.2))].map(p=>[p[0]-.25,p[1],p[2]]),.45,.4);
+        }
+        for(var col=1;col<32;col++){
+          if(col%3===1)continue;
+          var crack=[];
+          var first=col%3===0?0:2,last=col%4===0?7:6;
+          for(var row=first;row<=last;row++)crack.push(rockOutline(mesh[row][col],bank));
+          hydroLine(crack,col%3===0?.75:.5,col%3===0?.48:.29);
+          if(col%3===0){
+            hydroLine([mesh[3][col],mesh[4][col+1],mesh[5][col+1]].map(p=>rockOutline(p,bank)),.45,.25);
+          }
+        }
+        for(var seam=0;seam<34;seam++){
+          var trace=[],baseCol=.6+(seam*5.37%27),baseRow=.45+(seam*1.73%5.8);
+          for(var step=0;step<=16;step++){
+            var c=baseCol+step*.18,r=baseRow+Math.sin(step*.79+seam)*.11+step*.018;
+            trace.push(rockMeshPoint(mesh,c,r,bank));
+          }
+          hydroLine(trace,.45,.22);
+        }
+        for(var fissure=0;fissure<22;fissure++){
+          var trace=[],baseCol=1.4+fissure*1.35,baseRow=.5+(fissure*1.3%2.3);
+          for(var step=0;step<=16;step++){
+            var c=baseCol+Math.sin(step*1.13+fissure)*.14+step*.023,r=baseRow+step*.17;
+            trace.push(rockMeshPoint(mesh,c,r,bank));
+          }
+          hydroLine(trace,.55,.34);
+          var branch=[];
+          for(var step=0;step<=8;step++)branch.push(rockMeshPoint(mesh,baseCol+.22+step*.067,baseRow+1.4+step*.075,bank));
+          hydroLine(branch,.4,.24);
+        }
+        // Water-worn talus: closed, asymmetric boulders with a low submerged skirt.
+        for(var stone=0;stone<18;stone++){
+          var sx=197+stone*8.2+Math.sin(stone*4+bank)*2;
+          var sz=riverEdge(bank,sx)-bank*(.8+(stone%3)*.9),radius=.65+(stone*7%5)*.35;
+          var foot=[],cap=[];
+          for(var corner=0;corner<6;corner++){
+            var angle=corner*Math.PI/3,scale=1+Math.sin(stone*3+corner*7)*.18;
+            foot.push([sx+Math.cos(angle)*radius*scale,-.2,sz+Math.sin(angle)*radius*.7*scale]);
+            cap.push([sx+Math.cos(angle)*radius*.68*scale,.45+radius*(.4+.25*Math.sin(corner*2+stone)),sz+Math.sin(angle)*radius*.48*scale]);
+          }
+          hydroPanel(cap);
+          for(var corner=0;corner<6;corner++){
+            var next=(corner+1)%6;hydroPanel([foot[corner],foot[next],cap[next],cap[corner]]);
+            hydroLine([foot[corner],cap[corner]],.5,.4);
+          }
+          hydroLine(closedPath(cap),.75,.65);
+          shoreRocks.push({x:sx,z:sz,radius:radius});
         }
       }
       var bankPanelEnd=hydroPanels.length,bankPathEnd=hydroPaths.length;
+      function damBlock(left,right,bottom,top,front,back){
+        var a=damFront(left,bottom,front),b=damFront(right,bottom,front),c=damFront(right,top,front),d=damFront(left,top,front);
+        var e=damFront(left,bottom,back),f=damFront(right,bottom,back),g=damFront(right,top,back),h=damFront(left,top,back);
+        for(var face of [[a,b,c,d],[e,h,g,f],[a,d,h,e],[b,f,g,c],[d,c,g,h],[a,e,f,b]])hydroPanel(face);
+        hydroLine([a,d,c,b],.75,.68);
+        hydroLine([d,h,g,c],.6,.48);
+        hydroLine([a,e,h],.55,.38);hydroLine([b,f,g],.55,.38);
+      }
       var damCrest=[];
-      for(var section=0;section<20;section++){
-        var z0=-315+section*13,z1=z0+13;
+      for(var section=0;section<40;section++){
+        var z0=-315+section*6.5,z1=z0+6.5;
         var bottom0=damFaceX(z0,0),bottom1=damFaceX(z1,0);
         var top0=damFaceX(z0,56),top1=damFaceX(z1,56);
         hydroPanel([[bottom0,0,z0],[bottom1,0,z1],[top1,56,z1],[top0,56,z0]],section%4===0?'#212121':'#191919');
         hydroPanel([[top0,56,z0],[top1,56,z1],[top1+11,56,z1],[top0+11,56,z0]],'#252525');
-        if(section%2===0)hydroLine([[bottom0,0,z0],[top0,56,z0]],.65,.46);
+        hydroPanel([[top0+11,56,z0],[top1+11,56,z1],[top1+12,45,z1],[top0+12,45,z0]]);
+        if(section%2===0)hydroLine([damFront(z0,0,.08),damFront(z0,56,.08)],.55,.28);
         damCrest.push([top0,56,z0]);
       }
       damCrest.push([damFaceX(-55,56),56,-55]);
       hydroLine(damCrest,1.5,1);
       hydroLine(damCrest.map(p=>[p[0]+3,p[1]+1.6,p[2]]),.7,.72);
+      hydroLine(damCrest.map(p=>[p[0]+11,p[1],p[2]]),1,.8);
+      // Horizontal concrete lift joints bend with the arch in world space.
+      for(var jointY=7;jointY<39;jointY+=7){
+        var joint=[];
+        for(var section=0;section<=40;section++)joint.push(damFront(-315+section*6.5,jointY,.06));
+        hydroLine(joint,.45,.17);
+      }
       var damShelf=[];
       for(var shelfSection=0;shelfSection<=20;shelfSection++)damShelf.push(damFront(-315+shelfSection*13,39,.4));
       hydroLine(damShelf,1,.72);
@@ -845,9 +930,18 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         hydroPanel(opening,'#080808');
         hydroLine(opening.concat([opening[0]]),1,.95);
         hydroLine([damFront(centreZ,42,.76),damFront(centreZ,51,.76)],.55,.52);
-        var pierZ=rightZ+2.7,pier=[damFront(pierZ-1.5,8,.55),damFront(pierZ+1.5,8,.55),damFront(pierZ+1.5,55,.55),damFront(pierZ-1.5,55,.55)];
-        hydroPanel(pier,'#2b2b2b');
-        hydroLine([pier[0],pier[3],pier[2],pier[1]],.9,.62);
+        // Projecting jambs, lintel, sill and gate slats all have their own depth.
+        damBlock(leftZ-1,leftZ,41.5,52,2.2,.15);
+        damBlock(rightZ,rightZ+1,41.5,52,2.2,.15);
+        damBlock(leftZ,rightZ,51,52,2.2,.15);
+        damBlock(leftZ-1,rightZ+1,41.4,42,2.8,.15);
+        for(var slatY=43;slatY<51;slatY+=1.6)
+          hydroLine([damFront(leftZ+.4,slatY,.8),damFront(rightZ-.4,slatY,.8)],.45,.32);
+        var pierZ=rightZ+2.7;
+        // The centre remains clear for the three energy cables and the camera ascent.
+        if(Math.abs(pierZ+185)>5)damBlock(pierZ-1.1,pierZ+1.1,5,55,2.6,.1);
+        damBlock(centreZ-3,centreZ+3,56,59.5,-3,-7.5);
+        hydroLine([damFront(centreZ,52,1.3),damFront(centreZ,57,-3)],.65,.62);
       }
       for(var outlet=0;outlet<4;outlet++){
         var outletZ=-219+outlet*23;
@@ -855,6 +949,13 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         hydroPanel(mouth,'#030303');
         hydroLine([mouth[0],mouth[3],mouth[2],mouth[1]],1.1,.9);
         hydroLine([damFront(outletZ-5,13,.45),damFront(outletZ+5,13,.45)],.7,.65);
+        damBlock(outletZ-6,outletZ-5,0,12,2.3,.2);
+        damBlock(outletZ+5,outletZ+6,0,12,2.3,.2);
+        damBlock(outletZ-6,outletZ+6,11,12,2.3,.2);
+        // Recessed tunnel ribs and a projecting apron at each turbine outlet.
+        for(var rib=-3;rib<=3;rib+=2)
+          hydroLine([damFront(outletZ+rib,2,1),damFront(outletZ+rib,10,1)],.5,.42);
+        damBlock(outletZ-5.5,outletZ+5.5,.05,.4,8,.2);
       }
       // Powerhouse annex and service deck give the silhouette a clear industrial purpose.
       hydroPanel([[346,0,-102],[346,0,-72],[346,31,-72],[346,31,-102]],'#202020');
@@ -862,27 +963,75 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       hydroLine([[346,0,-102],[346,31,-102],[346,31,-72],[346,0,-72]],1.05,.92);
       for(var windowZ=-97;windowZ<=-76;windowZ+=7)
         hydroLine([[345.8,19,windowZ],[345.8,24,windowZ],[345.8,24,windowZ+4],[345.8,19,windowZ+4],[345.8,19,windowZ]],.7,.85);
-      for(var railZ=-305;railZ<=-65;railZ+=10)
-        hydroLine([[damFaceX(railZ,56)+3,57.6,railZ],[damFaceX(railZ,56)+3,59.2,railZ]],.55,.72);
+      for(var railZ=-311;railZ<=-59;railZ+=5.25)for(var railX of [1,10])
+        hydroLine([[damFaceX(railZ,56)+railX,56,railZ],[damFaceX(railZ,56)+railX,57.8,railZ]],.55,.62);
+      for(var railX of [1,10])for(var railY of [.9,1.8])
+        hydroLine(damCrest.map(p=>[p[0]+railX,p[1]+railY,p[2]]),.55,.58);
       hydroLine(damCrest.map(p=>[p[0]+3,p[1]+3.2,p[2]]),.65,.66);
+      // A maintenance ladder and caged landings sit off the central flight path.
+      for(var ladderZ of [-232,-138]){
+        for(var side of [-.65,.65]){
+          var upright=[];
+          for(var y=4;y<=39;y+=5)upright.push(damFront(ladderZ+side,y,1.5));
+          hydroLine(upright,.6,.56);
+        }
+        for(var y=4;y<=39;y+=1.4)hydroLine([damFront(ladderZ-.65,y,1.5),damFront(ladderZ+.65,y,1.5)],.45,.45);
+        damBlock(ladderZ-2,ladderZ+2,25,25.4,3.5,.2);
+      }
+      // Batch equal static strokes; the projected visibility traces are reused at rest.
+      var hydroStrokeGroups=[];
+      for(var range of [[0,bankPathEnd],[bankPathEnd,hydroPaths.length]]){
+        var groups=new Map();
+        for(var index=range[0];index<range[1];index++){
+          var path=hydroPaths[index],key=path.weight+','+path.alpha;
+          if(!groups.has(key))groups.set(key,{paths:[],weight:path.weight,alpha:path.alpha});
+          groups.get(key).paths.push(path.points);
+        }
+        hydroStrokeGroups.push(Array.from(groups.values()));
+      }
       var hydroDepthEntries=hydroPanels.map(p=>({building:{seed:91},face:{points:p.points},grow:1}));
+      var outletStreams=[];
+      for(var outlet=0;outlet<4;outlet++)for(var strand=0;strand<7;strand++){
+        var jet=[],z=-219+outlet*23+(strand-3)*.75;
+        for(var step=0;step<=16;step++){
+          var t=step/16;
+          jet.push([damFaceX(z,4)-2-t*14,Math.max(.23,4.1*(1-t*t*1.25)),z+Math.sin(t*7+strand)*t*.34]);
+        }
+        outletStreams.push(jet);
+      }
       function drawMovingWater(reveal){
         var time=reduceMotion?0:performance.now()*.001;
         // Broken, lengthwise surface currents replace evenly spaced cross-river stripes.
-        for(var current=0;current<6;current++){
+        for(var current=0;current<11;current++){
           var flow=[];
-          for(var x=192;x<=344;x+=5){
-            var z=-211+current*10.4+Math.sin(x*.095-time*1.4+current*1.7)*1.15;
-            flow.push([x,.11,z]);
+          for(var x=192;x<=344;x+=4){
+            var z=-216+current*6.1+Math.sin(x*.095-time*1.4+current*1.7)*1.15+Math.sin(x*.19+current)*.38;
+            flow.push([x,.16+Math.sin(x*.21-time*2+current)*.065,z]);
           }
-          strokePath3D(flow,rgb(contourBase),reveal*(.11+(current%3)*.025),.55);
+          strokePath3D(flow,rgb(contourBase),reveal*(.13+(current%3)*.035),.5);
         }
-        for(var fleck=0;fleck<72;fleck++){
+        for(var fleck=0;fleck<108;fleck++){
           var speed=3.8+(fleck%5)*.8;
           var distance=((fleck*19.7-time*speed)%150+150)%150;
           var fx=193+distance,fz=-216+(fleck*37%64)+Math.sin(time*.65+fleck)*.7;
           var length=1.5+(fleck%6)*.75;
-          strokePath3D([[fx,.13,fz],[fx-length*.48,.13,fz+.35],[fx-length,.13,fz-.16]],rgb(contourBase),reveal*(.16+(fleck%4)*.075),.55+(fleck%3)*.12);
+          var crest=.2+Math.sin(time*1.7+fleck)*.08;
+          strokePath3D([[fx,.13,fz],[fx-length*.48,crest,fz+.35],[fx-length,.13,fz-.16]],rgb(contourBase),reveal*(.16+(fleck%4)*.075),.55+(fleck%3)*.12);
+        }
+        for(var stone=0;stone<shoreRocks.length;stone+=2){
+          var rock=shoreRocks[stone],eddy=[];
+          for(var step=0;step<=12;step++){
+            var angle=-1+step*.27,spread=rock.radius*(1.35+.12*Math.sin(time*1.8+stone));
+            eddy.push([rock.x-1.1+Math.cos(angle)*spread*1.6,.17,rock.z+Math.sin(angle)*spread]);
+          }
+          strokePath3D(eddy,rgb(contourBase),reveal*.26,.55);
+        }
+        // Arcing 3D jets drop from the mouths into a shallow, turbulent plunge pool.
+        for(var jetIndex=0;jetIndex<outletStreams.length;jetIndex++){
+          var jet=outletStreams[jetIndex];
+          strokePath3D(jet,rgb(contourBase),reveal*.26,.65);
+          var phase=(time*.75+jetIndex*.137)%1,start=Math.floor(phase*11);
+          strokePath3D(jet.slice(start,start+5),rgb(contourGlint),reveal*.59,.8);
         }
         // Whitewater fans outward from the turbine outlets and travels downstream.
         for(var outlet=0;outlet<4;outlet++)for(var spray=0;spray<5;spray++){
@@ -895,16 +1044,16 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       function drawHydroScene(head){
         var reveal=smoothstep((head[0]-188)/72);
         if(reveal<=0)return;
-        function drawPaths(first,last){for(var index=first;index<last;index++){
-          var p=hydroPaths[index];
-          strokePath3D(p.points,rgb(contourHalo),reveal*p.alpha*.15,p.weight+1);
-          strokePath3D(p.points,rgb(contourBase),reveal*p.alpha,p.weight);
+        function drawPaths(group){for(var index=0;index<hydroStrokeGroups[group].length;index++){
+          var p=hydroStrokeGroups[group][index];
+          strokePaths3D(p.paths,rgb(contourHalo),reveal*p.alpha*.15,p.weight+1);
+          strokePaths3D(p.paths,rgb(contourBase),reveal*p.alpha,p.weight);
         }}
         // Paint the dam first, then the nearer cliffs over it so no far outlines leak through rock.
         for(var panel=bankPanelEnd;panel<hydroPanels.length;panel++)fillSurface3D(hydroPanels[panel].points,hydroPanels[panel].color,reveal);
-        drawPaths(bankPathEnd,hydroPaths.length);
+        drawPaths(1);
         for(var panel=1;panel<bankPanelEnd;panel++)fillSurface3D(hydroPanels[panel].points,hydroPanels[panel].color,reveal);
-        drawPaths(0,bankPathEnd);
+        drawPaths(0);
         fillSurface3D(hydroPanels[0].points,hydroPanels[0].color,reveal);
         drawMovingWater(reveal);
       }

@@ -88,6 +88,32 @@ $checks = @'
         if(hiddenDescriptor)Object.defineProperty(document,'hidden',hiddenDescriptor);else delete document.hidden;
         draw=savedDraw;
         if(width<700){moveTo(175);captures.push({name:'mobile-workshop',image:canvas.toDataURL('image/png')});}
+        // Inspect the canyon from the river and while climbing the curved dam.
+        moveTo(242);captures.push({name:'river-approach',image:canvas.toDataURL('image/png')});
+        moveTo(296);captures.push({name:'canyon',image:canvas.toDataURL('image/png')});
+        var cliff=projectInto(300,15,-185,{});
+        check(cliff.visible&&visibleAt(cliff.x,cliff.y,1/cliff.depth),'River corridor remains open between the detailed cliffs');
+        var front=damFront(-185,28,3),behind=damFront(-185,28,-3);
+        var frontPixel=projectInto(...front,{}),behindPixel=projectInto(...behind,{});
+        check(frontPixel.visible&&visibleAt(frontPixel.x,frontPixel.y,1/frontPixel.depth),'Central dam ascent stays clear of projecting piers');
+        check(behindPixel.visible&&!visibleAt(behindPixel.x,behindPixel.y,1/behindPixel.depth),'Solid curved dam hides geometry behind its face');
+        moveTo(334);captures.push({name:'dam-outlets',image:canvas.toDataURL('image/png')});
+        var visibleJets=outletStreams.filter(p=>buildStrokeTrace(p).hasVisibleSamples);
+        check(visibleJets.length>0,'Outlet jets emerge in front of the solid dam');
+        var realNow=performance.now.bind(performance),waterFrames=[];
+        for(var moment of [1000,1800]){
+          performance.now=function(){return moment;};draw();waterFrames.push(canvas.toDataURL());
+        }
+        check(waterFrames[0]!==waterFrames[1],'Flowing water changes at a stationary camera');
+        reduceMotion=true;waterFrames=[];
+        for(var moment of [2000,2800]){
+          performance.now=function(){return moment;};draw();waterFrames.push(canvas.toDataURL());
+        }
+        check(waterFrames[0]===waterFrames[1],'Reduced motion keeps the canyon and water stable');
+        performance.now=realNow;reduceMotion=false;
+        moveTo(355);captures.push({name:'dam-ascent',image:canvas.toDataURL('image/png')});
+        scrollProgress=1;draw();captures.push({name:'dam-crest',image:canvas.toDataURL('image/png')});
+        moveTo(242);check(buildStrokeTrace(hydroPaths[0].points).hasVisibleSamples,'Reverse travel restores the canyon shoreline');
       }catch(error){results.push({name:error.stack,pass:false});}
       var output=document.createElement('pre');output.id='scene-check-results';output.textContent=JSON.stringify({results:results,captures:captures});document.body.appendChild(output);
 '@
