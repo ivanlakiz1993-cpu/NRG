@@ -443,10 +443,10 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           for(var i=0;i<footprint.length;i++){
             var j=(i+1)%footprint.length,points=[bottom[i],bottom[j],top[j],top[i]],windows=[];
             var span=Math.hypot(bottom[j][0]-bottom[i][0],bottom[j][2]-bottom[i][2]);
-            if(detail&&span>.55&&(!building.final||(span>20&&Math.min(tops[i],tops[j])>17))){
-              var windowStyle=building.final?2:building.variant%4;
-              var rows=building.final?1:Math.max(1,Math.floor((Math.min(tops[i],tops[j])-y0-.7)/(windowStyle===3?2.7:2.1)));
-              var cols=building.final?3:Math.max(1,Math.floor(span/(windowStyle===2?3.2:windowStyle===1?1.25:1.8)));
+            if(detail&&span>.55&&!building.final){
+              var windowStyle=building.variant%4;
+              var rows=Math.max(1,Math.floor((Math.min(tops[i],tops[j])-y0-.7)/(windowStyle===3?2.7:2.1)));
+              var cols=Math.max(1,Math.floor(span/(windowStyle===2?3.2:windowStyle===1?1.25:1.8)));
               for(var row=0;row<rows;row++)for(var col=0;col<cols;col++){
                 var inset=windowStyle===1?.34:windowStyle===2?.08:.22;
                 var t0=(col+inset)/cols,t1=(col+1-inset)/cols;
@@ -634,6 +634,22 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           roundBox(-w*.64,w*.64,0,h*.43,0,-d,Math.min(d*.44,w*.35),true);
           roundBox(-w*.58,w*.16,h*.43,h*.86,-d*.15,-d+.4,Math.min(d*.32,w*.26),true);
           roundBox(-w*.7,w*.69,1.35,1.6,.45,-1.8,.95,false);
+        }
+        if(building.final){
+          var exitPlane=z-d;
+          faces.forEach(function(factoryFace){
+            if(!factoryFace.points.every(p=>Math.abs(p[2]-exitPlane)<1.1))return;
+            var minX=Math.min(...factoryFace.points.map(p=>p[0])),maxX=Math.max(...factoryFace.points.map(p=>p[0]));
+            var topY=Math.max(...factoryFace.points.map(p=>p[1]));
+            if(maxX-minX<8||topY<17)return;
+            factoryFace.twoSided=true;factoryFace.windows=[];
+            var cellWidth=(maxX-minX)/3,windowBottom=9.4,windowHeight=Math.min(6.2,topY-windowBottom-1.2),windowZ=factoryFace.points[0][2]+.015;
+            for(var paneIndex=0;paneIndex<3;paneIndex++){
+              var left=minX+cellWidth*(paneIndex+.1),right=minX+cellWidth*(paneIndex+.9);
+              factoryFace.windows.push({points:[[left,windowBottom,windowZ],[right,windowBottom,windowZ],[right,windowBottom+windowHeight,windowZ],[left,windowBottom+windowHeight,windowZ]],row:0,col:paneIndex,style:2,
+                lightColor:windowLightColors[paneIndex],lightOpacity:.78,lightDelay:.08,lightOn:true,lightFlicker:false,lightOnset:-1});
+            }
+          });
         }
         var litPanes=faces.flatMap(face=>face.windows).filter(pane=>pane.lightOn);
         if(litPanes.length){
@@ -1280,11 +1296,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             line([[7.6,.1,guardZ],[7.6,4.8,guardZ],[8.3,4.8,guardZ]],.92,.54);
             line([[18.4,.1,guardZ],[18.4,4.8,guardZ],[17.7,4.8,guardZ]],.92,.54);
           }
-          // Roller conveyor, motor housings and guarded transfer section, outside the cable lane.
+          // Enclosed transfer platform and motor housing, clear of the cable lane.
           frameBox(8.2,17.6,.55,1.35,-52,-70,.88,.64,'#1a1a1a');
-          for(var rollerZ=-53;rollerZ>=-69;rollerZ-=2.5){
-            line([[8.05,1.3,rollerZ],[17.75,1.3,rollerZ]],.9,.48);
-          }
           frameBox(15.4,17.1,1.35,2.55,-56,-58,.94,.56,'#252525');
           ring(16.25,1.9,-57,.42,.95);
           // Electrical cabinets, pump skid and a smaller lathe form a second recognizable bay.
