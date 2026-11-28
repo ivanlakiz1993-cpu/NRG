@@ -14,8 +14,8 @@ the entrance, workshop, exit, river, canyon, dam outlets, ascent and crest at
 clearance of the central ascent, visible outlet jets, flowing water at a stationary
 camera, reverse travel and a stable reduced-motion state.
 The final-map checks also verify the local Figma SVG, original region IDs and
-aspect ratio and maximum viewport fit without cropping, a brief level advance
-after the ascent, delayed compact panel lamps,
+aspect ratio and a compact layout with reserved space below, a level advance
+past the dam, delayed compact panel lamps, a map hidden until cable contact,
 the three cable endpoints, persistent blue/indigo/green contour illumination,
 complete cable absorption, the stopped
 animation loop at the final frame and isolated region illumination. A temporary

@@ -152,12 +152,12 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         [361,59,-185],[378,59,-185]
       ],36);
       var mapRiseEnd=route.length-1;
-      // A short, level advance beyond the crest precedes the control-panel lamps.
-      route.push(...sampleCurve([[378,59,-185],[386,59,-185],[394,59,-185]],12).slice(1));
+      // Continue beyond the dam far enough for the following camera to clear it.
+      route.push(...sampleCurve([[378,59,-185],[422,59,-185],[466,59,-185]],24).slice(1));
       function at(i){i=Math.max(0,Math.min(route.length-1,i));var k=Math.floor(i),a=route[k],b=route[Math.min(k+1,route.length-1)];return a.map((v,j)=>v+(b[j]-v)*(i-k))}
       var sceneStart=90;
       var originalRouteEnd=26*36;
-      var routeEnd=route.length-1,journeyEnd=routeEnd+80;
+      var routeEnd=route.length-1,mapWorldClearIndex=mapRiseEnd+40,journeyEnd=routeEnd+80;
       function sceneProgressAt(index){return (index-sceneStart)/(journeyEnd-sceneStart);}
       var routeDistances=[0];
       for(var distanceIndex=1;distanceIndex<route.length;distanceIndex++){
@@ -195,10 +195,10 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var targetX=head[0]+heading[0]*5*turn;
         var targetZ=head[2]-3*(1-turn)+heading[2]*5*turn;
         var targetY=(head[1]+.7)*(1-turn)+(1.15+head[1]*ascent)*turn;
-        if(i>mapRiseEnd){
+        if(i>mapWorldClearIndex-8){
           // Raise the gaze during the short level advance. The cable tips approach
           // the panel lamps from below rather than overshooting and bending back.
-          var departure=smoothstep((i-mapRiseEnd)/16),layout=mapLayout();
+          var departure=smoothstep((i-mapWorldClearIndex+8)/12),layout=mapLayout();
           var tipY=head[1]-2.76+.95*smoothstep((head[0]-356)/12);
           var tipDistance=Math.hypot(head[0]-cameraX,head[2]-cameraZ);
           var screenSlope=(height*.51-layout.indicatorY-height*.035)/focal;
@@ -1911,23 +1911,23 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         }));
       }
       function mapFinaleState(index){
-        var power=smoothstep((index-routeEnd)/8);
+        var power=smoothstep((index-routeEnd)/10);
         return {
-          reveal:smoothstep((index-mapRiseEnd+30)/30),
-          handoff:smoothstep((index-mapRiseEnd-16)/8),
-          darkness:smoothstep((index-mapRiseEnd)/12),
-          lamps:smoothstep((index-mapRiseEnd-14)/6),
+          reveal:power,
+          handoff:smoothstep((index-mapWorldClearIndex-2)/(routeEnd-mapWorldClearIndex-2)),
+          darkness:smoothstep((index-mapWorldClearIndex+8)/8),
+          lamps:smoothstep((index-mapWorldClearIndex)/4),
           absorb:smoothstep((index-routeEnd-2)/45),
           charge:power,
           power:power
         };
       }
       function mapLayout(){
-        // Contain the complete SVG in the viewport with only a slim safety margin.
-        var w=Math.min(width*.98,height*.96*1177/731.722),h=w*731.722/1177;
-        var x=(width-w)*.5,y=(height-h)*.5;
-        var gap=Math.max(22,height*.035),radius=Math.min(14,Math.max(8,width*.012));
-        return {x:x,y:y,w:w,h:h,indicatorY:Math.min(height*.91,y+h+gap),spacing:radius*2.7,radius:radius};
+        // Keep the full, sharp SVG above the space reserved for company content.
+        var w=Math.min(width*(width<700?.94:.88),height*.66*1177/731.722),h=w*731.722/1177;
+        var x=(width-w)*.5,y=Math.max(height*.035,(height*.70-h)*.5);
+        var gap=Math.max(20,height*.025),radius=Math.min(14,Math.max(8,width*.012));
+        return {x:x,y:y,w:w,h:h,indicatorY:y+h+gap,spacing:radius*2.7,radius:radius,detailsTop:height*.78};
       }
       function mapRaster(source,color,layout){
         var layer=document.createElement('canvas'),scale=dpr;
@@ -1989,10 +1989,10 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         });
       }
       function drawMapContours(state,layout){
-        if(!mapLoaded)return;
+        if(!mapLoaded||state.reveal<=0)return;
         prepareMapLayers(layout);
         ctx.save();ctx.globalCompositeOperation='lighter';
-        // The unpowered map is already legible; connection adds the wire colours.
+        // Map visibility starts at contact, together with the three wire colours.
         ctx.globalAlpha=state.reveal*(.86-.44*state.power);
         ctx.drawImage(mapLayers[0],layout.x,layout.y,layout.w,layout.h);
         if(state.power>0){
@@ -2045,18 +2045,20 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         if(finale.darkness<1){
           drawStreetscape(head);drawHydroScene(head);
           drawWindField(head,performance.now()/1000);
-        }
+        }else prepareDepth([]);
         var ribbons=lanes.map(lane=>buildRibbon(i,lane));
         var time=performance.now()/1000;
-        if(finale.reveal>0){
+        if(finale.darkness>0){
           ctx.save();ctx.globalAlpha=finale.darkness;ctx.fillStyle='#000';ctx.fillRect(0,0,width,height);ctx.restore();
-          var layout=mapLayout();drawMapContours(finale,layout);
-          if(finale.handoff>0)drawInnerCurrent(mapCables(ribbons,finale,layout),time,true);
-          else drawInnerCurrent(ribbons,time);
-          drawMapIndicators(finale,layout);
+        }
+        var layout=mapLayout();
+        if(finale.reveal>0)drawMapContours(finale,layout);
+        if(finale.handoff>0){
+          drawInnerCurrent(mapCables(ribbons,finale,layout),time,true);
         }else{
           drawInnerCurrent(ribbons,time);drawCrossingSparks(ribbons,time);
         }
+        if(finale.lamps>0)drawMapIndicators(finale,layout);
       }
       function render(time) { draw(time); }
 
