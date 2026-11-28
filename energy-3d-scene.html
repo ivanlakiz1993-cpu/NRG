@@ -443,7 +443,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           for(var i=0;i<footprint.length;i++){
             var j=(i+1)%footprint.length,points=[bottom[i],bottom[j],top[j],top[i]],windows=[];
             var span=Math.hypot(bottom[j][0]-bottom[i][0],bottom[j][2]-bottom[i][2]);
-            if(detail&&span>.55){
+            var isFactoryPortal=building.final&&detail&&y0<.1&&span>35&&Math.max(...tops)>15&&Math.abs(bottom[i][2]-bottom[j][2])<.001&&(Math.abs(bottom[i][2]-z)<.08||Math.abs(bottom[i][2]-(z-100))<.08);
+            if(detail&&span>.55&&(!building.final||isFactoryPortal)){
               var windowStyle=building.final?2:building.variant%4;
               var rows=Math.max(1,Math.floor((Math.min(tops[i],tops[j])-y0-.7)/(building.final?4.8:windowStyle===3?2.7:2.1)));
               var cols=Math.max(1,Math.floor(span/(windowStyle===2?3.2:windowStyle===1?1.25:1.8)));
@@ -463,7 +464,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
                   lightFlicker:false,lightOnset:-1});
               }
             }
-            var isFactoryPortal=building.final&&detail&&y0<.1&&span>35&&Math.max(...tops)>15&&Math.abs(bottom[i][2]-bottom[j][2])<.001&&(Math.abs(bottom[i][2]-z)<.08||Math.abs(bottom[i][2]-(z-100))<.08);
             if(isFactoryPortal){
               var portalHalf=8.2,portalHeight=6.6,leftX=Math.min(bottom[i][0],bottom[j][0]),rightX=Math.max(bottom[i][0],bottom[j][0]),wallZ=bottom[i][2];
               // Three larger panes per row sit clear of the portal's full-height uprights.
