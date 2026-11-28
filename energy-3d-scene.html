@@ -1147,8 +1147,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         if(!building.detailPaths){
           var paths=[],panels=[];
           function worldPoint(p){return [84-p[2],p[1],-185+p[0]];}
-          function line(points,stage,weight,alpha,keepForecourt){if(!keepForecourt&&points.every(function(point){return point[2]>.15;}))return;paths.push({points:points.map(worldPoint),stage:stage,weight:weight||.65,alpha:alpha===undefined?1:alpha});}
-          function panel(points,stage,color,keepForecourt){if(!keepForecourt&&points.every(function(point){return point[2]>.15;}))return;panels.push({points:points.map(worldPoint),stage:stage,color:'#000000'});}
+          function line(points,stage,weight,alpha){if(points.every(function(point){return point[2]>.15;}))return;paths.push({points:points.map(worldPoint),stage:stage,weight:weight||.65,alpha:alpha===undefined?1:alpha});}
+          function panel(points,stage,color){if(points.every(function(point){return point[2]>.15;}))return;panels.push({points:points.map(worldPoint),stage:stage,color:'#000000'});}
           function ring(x,y,z,r,stage){var points=[];for(var k=0;k<=16;k++){var angle=k/16*Math.PI*2;points.push([x+Math.cos(angle)*r,y,z+Math.sin(angle)*r]);}line(points,stage,.65);}
           // A continuous workshop shell: dark floor and inward-facing walls, with an open drive-through aisle.
           panel([[-28.5,0,-.15],[21.5,0,-.15],[21.5,0,-99.85],[-28.5,0,-99.85]],.5,'#000000');
@@ -1209,18 +1209,18 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             var ceilingGlow=[[lampX-3,fixtureY-.01,lampZ-4],[lampX+3,fixtureY-.01,lampZ-4],[lampX+3,fixtureY-.01,lampZ+4],[lampX-3,fixtureY-.01,lampZ+4]];
             building.interiorLamps.push({points:lampPoints,glow:ceilingGlow.map(worldPoint),lightOn:true,lightOpacity:.9,lightDelay:0,lightFlicker:false,lightOnset:-1});
           }
-          function frameBox(x0,x1,y0,y1,z0,z1,stage,weight,solid,keepForecourt){
+          function frameBox(x0,x1,y0,y1,z0,z1,stage,weight,solid){
             var points=[[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],[x0,y0,z0],[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1],[x0,y0,z1]];
-            line(points,stage,weight||.62,undefined,keepForecourt);
-            line([[x1,y0,z0],[x1,y0,z1]],stage,weight||.62,undefined,keepForecourt);
-            line([[x1,y1,z0],[x1,y1,z1]],stage,weight||.62,undefined,keepForecourt);
-            line([[x0,y1,z0],[x0,y1,z1]],stage,weight||.62,undefined,keepForecourt);
+            line(points,stage,weight||.62);
+            line([[x1,y0,z0],[x1,y0,z1]],stage,weight||.62);
+            line([[x1,y1,z0],[x1,y1,z1]],stage,weight||.62);
+            line([[x0,y1,z0],[x0,y1,z1]],stage,weight||.62);
             if(solid){
-              panel([[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0]],stage,solid,keepForecourt);
-              panel([[x1,y0,z1],[x0,y0,z1],[x0,y1,z1],[x1,y1,z1]],stage,solid,keepForecourt);
-              panel([[x0,y0,z1],[x0,y0,z0],[x0,y1,z0],[x0,y1,z1]],stage,solid,keepForecourt);
-              panel([[x1,y0,z0],[x1,y0,z1],[x1,y1,z1],[x1,y1,z0]],stage,solid,keepForecourt);
-              panel([[x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1]],stage,solid,keepForecourt);
+              panel([[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0]],stage,solid);
+              panel([[x1,y0,z1],[x0,y0,z1],[x0,y1,z1],[x1,y1,z1]],stage,solid);
+              panel([[x0,y0,z1],[x0,y0,z0],[x0,y1,z0],[x0,y1,z1]],stage,solid);
+              panel([[x1,y0,z0],[x1,y0,z1],[x1,y1,z1],[x1,y1,z0]],stage,solid);
+              panel([[x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1]],stage,solid);
             }
           }
           // Black base skirting draws a continuous wall-to-floor seam along both side walls.
@@ -1327,13 +1327,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           line([[-16,2.2,-52],[-10,2.2,-52],[-10,2.2,-58],[-16,2.2,-58]],.94,.58);
           frameBox(-16,-9,.2,2.1,-77,-86,.93,.62,'#1e1e1e');
           frameBox(-15.5,-9.5,2.1,3.2,-79,-84,.95,.58,'#282828');
-          // Keep the original split guardrails beside the entrance.
-          for(var side of [-1,1]){
-            var begin=side<0?-22:10,end=side<0?-10:22;
-            for(var y of [6.05,6.4,6.75])line([[begin,y,6.3],[end,y,6.3]],.6,.85,undefined,true);
-            for(var x=begin;x<=end;x+=2){line([[x,5.8,6.3],[x,7.1,6.3]],.68,.45,undefined,true);}
-            line([[begin,7.1,6.3],[end,7.1,6.3]],.7,.5,undefined,true);
-          }
           // Service pipes use broad, rounded elbows to connect the tank yard.
           for(var y of [2.2,2.65]){
             var pipe=[[28,y,6.3],[37,y,6.3]];
