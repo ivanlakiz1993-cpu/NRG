@@ -1146,8 +1146,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         if(!building.detailPaths){
           var paths=[],panels=[];
           function worldPoint(p){return [84-p[2],p[1],-185+p[0]];}
-          function line(points,stage,weight,alpha){if(points.every(function(point){return point[2]>.15;}))return;paths.push({points:points.map(worldPoint),stage:stage,weight:weight||.65,alpha:alpha===undefined?1:alpha});}
-          function panel(points,stage,color){if(points.every(function(point){return point[2]>.15;}))return;panels.push({points:points.map(worldPoint),stage:stage,color:'#000000'});}
+          function line(points,stage,weight,alpha,keepForecourt){if(!keepForecourt&&points.every(function(point){return point[2]>.15;}))return;paths.push({points:points.map(worldPoint),stage:stage,weight:weight||.65,alpha:alpha===undefined?1:alpha});}
+          function panel(points,stage,color,keepForecourt){if(!keepForecourt&&points.every(function(point){return point[2]>.15;}))return;panels.push({points:points.map(worldPoint),stage:stage,color:'#000000'});}
           function ring(x,y,z,r,stage){var points=[];for(var k=0;k<=16;k++){var angle=k/16*Math.PI*2;points.push([x+Math.cos(angle)*r,y,z+Math.sin(angle)*r]);}line(points,stage,.65);}
           // A continuous workshop shell: dark floor and inward-facing walls, with an open drive-through aisle.
           panel([[-28.5,0,-.15],[21.5,0,-.15],[21.5,0,-99.85],[-28.5,0,-99.85]],.5,'#000000');
@@ -1208,18 +1208,18 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             var ceilingGlow=[[lampX-3,fixtureY-.01,lampZ-4],[lampX+3,fixtureY-.01,lampZ-4],[lampX+3,fixtureY-.01,lampZ+4],[lampX-3,fixtureY-.01,lampZ+4]];
             building.interiorLamps.push({points:lampPoints,glow:ceilingGlow.map(worldPoint),lightOn:true,lightOpacity:.9,lightDelay:0,lightFlicker:false,lightOnset:-1});
           }
-          function frameBox(x0,x1,y0,y1,z0,z1,stage,weight,solid){
+          function frameBox(x0,x1,y0,y1,z0,z1,stage,weight,solid,keepForecourt){
             var points=[[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],[x0,y0,z0],[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1],[x0,y0,z1]];
-            line(points,stage,weight||.62);
-            line([[x1,y0,z0],[x1,y0,z1]],stage,weight||.62);
-            line([[x1,y1,z0],[x1,y1,z1]],stage,weight||.62);
-            line([[x0,y1,z0],[x0,y1,z1]],stage,weight||.62);
+            line(points,stage,weight||.62,undefined,keepForecourt);
+            line([[x1,y0,z0],[x1,y0,z1]],stage,weight||.62,undefined,keepForecourt);
+            line([[x1,y1,z0],[x1,y1,z1]],stage,weight||.62,undefined,keepForecourt);
+            line([[x0,y1,z0],[x0,y1,z1]],stage,weight||.62,undefined,keepForecourt);
             if(solid){
-              panel([[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0]],stage,solid);
-              panel([[x1,y0,z1],[x0,y0,z1],[x0,y1,z1],[x1,y1,z1]],stage,solid);
-              panel([[x0,y0,z1],[x0,y0,z0],[x0,y1,z0],[x0,y1,z1]],stage,solid);
-              panel([[x1,y0,z0],[x1,y0,z1],[x1,y1,z1],[x1,y1,z0]],stage,solid);
-              panel([[x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1]],stage,solid);
+              panel([[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0]],stage,solid,keepForecourt);
+              panel([[x1,y0,z1],[x0,y0,z1],[x0,y1,z1],[x1,y1,z1]],stage,solid,keepForecourt);
+              panel([[x0,y0,z1],[x0,y0,z0],[x0,y1,z0],[x0,y1,z1]],stage,solid,keepForecourt);
+              panel([[x1,y0,z0],[x1,y0,z1],[x1,y1,z1],[x1,y1,z0]],stage,solid,keepForecourt);
+              panel([[x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1]],stage,solid,keepForecourt);
             }
           }
           function cncLathe(left,right,front,back,height,stage){
@@ -1332,12 +1332,12 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             for(var dx of [-.22,.22])line([[x+dx,0,-5.52],[x+dx,top+1.05,-5.52]],.55,.55);
             for(var y=.4;y<top+.8;y+=.45)line([[x-.22,y,-5.5],[x+.22,y,-5.5]],.7,.4);
           }
-          // Pipe rack remains outside the hall with a six-metre entrance gap.
+          // Keep the original split guardrails beside the entrance.
           for(var side of [-1,1]){
             var begin=side<0?-26:6,end=side<0?-6:26;
-            for(var y of [6.05,6.4,6.75])line([[begin,y,6.3],[end,y,6.3]],.6,.85);
-            for(var x=begin;x<=end;x+=2){line([[x,5.8,6.3],[x,7.1,6.3]],.68,.45);}
-            line([[begin,7.1,6.3],[end,7.1,6.3]],.7,.5);
+            for(var y of [6.05,6.4,6.75])line([[begin,y,6.3],[end,y,6.3]],.6,.85,undefined,true);
+            for(var x=begin;x<=end;x+=2){line([[x,5.8,6.3],[x,7.1,6.3]],.68,.45,undefined,true);}
+            line([[begin,7.1,6.3],[end,7.1,6.3]],.7,.5,undefined,true);
           }
           // Service pipes use broad, rounded elbows to connect the tank yard.
           for(var y of [2.2,2.65]){
@@ -1345,21 +1345,17 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             for(var k=1;k<=12;k++){var angle=k/12*Math.PI/2;pipe.push([37+2*Math.sin(angle),y,4.3+2*Math.cos(angle)]);}
             pipe.push([39,y,-5.5]);line(pipe,.65,.8);
           }
-          // Forecourt: short fencing, parking/loading marks and slender light poles.
-          for(var side of [-1,1]){
-            var inner=side*8,outer=side*31;
-            for(var z of [10,17])line([[inner,0,z],[outer,0,z]],.45,.55,.6);
-            for(var x=10;x<=30;x+=5)line([[side*x,0,10],[side*x,0,17]],.6,.45,.55);
-            for(var x of [9,15,21,27]){
-              line([[side*x,0,20],[side*x,1.2,20]],.55,.7);
-            }
-            line([[side*9,.55,20],[side*27,.55,20]],.65,.5);
-            for(var x of [12,29]){
-              var sx=side*x;
-              line([[sx,0,13],[sx,7,13],[sx-side*.35,7.6,13],[sx-side*1.8,7.6,13]],.55,.75);
-              line([[sx-side*1.4,7.5,13],[sx-side*2.2,7.5,13]],.7,1.5);
-            }
-          }
+          // One detailed 3D streetlamp remains on the left side of the forecourt.
+          var lampX=-12,lampZ=13;
+          frameBox(lampX-.42,lampX+.42,.05,.48,lampZ+.42,lampZ-.42,.52,.72,'#000000',true);
+          frameBox(lampX-.18,lampX+.18,.48,6.95,lampZ+.18,lampZ-.18,.54,.78,'#000000',true);
+          frameBox(lampX-.25,lampX+.25,6.78,7.08,lampZ+.25,lampZ-.25,.56,.76,'#000000',true);
+          frameBox(lampX+.05,lampX+1.78,6.85,7.08,lampZ+.15,lampZ-.15,.57,.72,'#000000',true);
+          line([[lampX+.1,6.3,lampZ],[lampX+.6,6.85,lampZ],[lampX+1.2,6.85,lampZ]],.58,.72,undefined,true);
+          frameBox(lampX+1.45,lampX+2.25,6.42,6.86,lampZ+.42,lampZ-.42,.6,.82,'#000000',true);
+          var forecourtLampPoints=[[lampX+1.55,6.405,lampZ-.32],[lampX+2.15,6.405,lampZ-.32],[lampX+2.15,6.405,lampZ+.32],[lampX+1.55,6.405,lampZ+.32]].map(worldPoint);
+          var forecourtLampGlow=[[lampX+.8,6.39,lampZ-1.25],[lampX+2.9,6.39,lampZ-1.25],[lampX+2.9,6.39,lampZ+1.25],[lampX+.8,6.39,lampZ+1.25]].map(worldPoint);
+          building.forecourtLamp={points:forecourtLampPoints,glow:forecourtLampGlow,lightOn:true,lightOpacity:.95,lightDelay:0,lightFlicker:false,lightOnset:-1};
           // Silo seams and roof guards, with a common transfer conveyor behind the vessels.
           for(var sx of [-30,-22,-14]){
             for(var y of [2,7,12,16])ring(sx,y,27,2.74,.4);
@@ -1431,6 +1427,13 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             strokePath3D(points.concat([points[0]]),rgb([255,246,224]),light*.6,.8);
           });
         });
+        if(building.forecourtLamp){
+          var exteriorLight=windowLightAmount(building.forecourtLamp,1,lightNow,true);
+          if(exteriorLight>0){
+            drawWindowLight(building.forecourtLamp.points,[255,226,181],exteriorLight,true,building.forecourtLamp.glow);
+            strokePath3D(building.forecourtLamp.points.concat([building.forecourtLamp.points[0]]),rgb([255,246,224]),exteriorLight*.72,.85);
+          }
+        }
       }
       var lanes=[-1,0,1];
       function ribbonStart(i){
