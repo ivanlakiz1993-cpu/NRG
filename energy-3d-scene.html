@@ -10,7 +10,7 @@
     html, body { margin: 0; min-height: 100%; background: #000000; }
     html { scrollbar-color: #777777 #000000; }
     body { overflow-x: hidden; }
-    .flight { position: relative; height: 1950svh; }
+    .flight { position: relative; height: 2250svh; }
     .screen {
       position: sticky; top: 0; width: 100%; height: 100svh; min-height: 0;
       overflow: hidden; background: #000000; isolation: isolate;
@@ -22,7 +22,7 @@
     canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
     @media (max-width: 700px) {
       .screen { min-height: 0; }
-      .flight { height: 1660svh; }
+      .flight { height: 1920svh; }
     }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
@@ -32,7 +32,7 @@
 <body>
   <main class="flight" aria-label="Интерактивная 3D-сцена энергопередачи">
     <div class="screen">
-      <canvas id="scene" aria-label="Три электрических потока проходят через здания и включают свет"></canvas>
+      <canvas id="scene" aria-label="Три электрических потока проходят через город и плотину, входят в три индикатора и включают карту России"></canvas>
     </div>
   </main>
   <script>
@@ -153,6 +153,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       ],36);      function at(i){i=Math.max(0,Math.min(route.length-1,i));var k=Math.floor(i),a=route[k],b=route[Math.min(k+1,route.length-1)];return a.map((v,j)=>v+(b[j]-v)*(i-k))}
       var sceneStart=90;
       var originalRouteEnd=26*36;
+      var routeEnd=route.length-1,journeyEnd=routeEnd+300;
+      function sceneProgressAt(index){return (index-sceneStart)/(journeyEnd-sceneStart);}
       var routeDistances=[0];
       for(var distanceIndex=1;distanceIndex<route.length;distanceIndex++){
         var previous=route[distanceIndex-1],current=route[distanceIndex];
@@ -1754,16 +1756,17 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         return a.map((v,j)=>v+(b[j]-v)*t);
       }
       var wireColors=[[0,117,190],[40,53,130],[118,183,42]];
-      function drawInnerCurrent(ribbons,time){
+      function drawInnerCurrent(ribbons,time,screenSpace){
         var reveal=smoothstep(scrollProgress/.025);
         if(reveal<=0)return;
+        var stroke=screenSpace?strokeScreenPath:strokePath3D;
         var speeds=[.23,.19,.21],offsets=[.08,.47,.76];
         ribbons.forEach(function(line,lane){
           if(line.length<2)return;
           var color=wireColors[lane],length=line.length-1;
           var weight=(width<700?.78:1)*(lane===0?1.2:lane===1?.82:.9);
           // A faint conductor remains visible when its energy pulse has passed.
-          strokePath3D(line,rgb(mixColor(color,[210,225,245],.45)),(.19+(lane===0?.03:0))*reveal,1.35*weight);
+          stroke(line,rgb(mixColor(color,[210,225,245],.45)),(.19+(lane===0?.03:0))*reveal,1.35*weight);
           var phase=reduceMotion?offsets[lane]:((time*speeds[lane]+offsets[lane])%1+1)%1;
           var tail=length*.72,sections=16;
           ctx.save();
@@ -1786,18 +1789,18 @@ function sampleCurve(controlPoints, samplesPerLeg) {
                 var position=from+(to-from)*sample/10;
                 if(sample&&Math.floor(position/length)!==Math.floor((from+(to-from)*(sample-1)/10)/length)){
                   if(path.length>1){
-                    strokePath3D(path,rgb(color),fade*.16*reveal,8*weight);
-                    strokePath3D(path,tone,fade*.74*reveal,2.7*weight);
-                    if(hot>0)strokePath3D(path,'rgb(255,255,255)',hot*fade*.72*reveal,.85*weight);
+                    stroke(path,rgb(color),fade*.16*reveal,8*weight);
+                    stroke(path,tone,fade*.74*reveal,2.7*weight);
+                    if(hot>0)stroke(path,'rgb(255,255,255)',hot*fade*.72*reveal,.85*weight);
                   }
                   path=[];
                 }
                 path.push(ribbonPoint(line,((position%length)+length)%length));
               }
               if(path.length>1){
-                strokePath3D(path,rgb(color),fade*.16*reveal,8*weight);
-                strokePath3D(path,tone,fade*.74*reveal,2.7*weight);
-                if(hot>0)strokePath3D(path,'rgb(255,255,255)',hot*fade*.72*reveal,.85*weight);
+                stroke(path,rgb(color),fade*.16*reveal,8*weight);
+                stroke(path,tone,fade*.74*reveal,2.7*weight);
+                if(hot>0)stroke(path,'rgb(255,255,255)',hot*fade*.72*reveal,.85*weight);
               }
             }
           }
@@ -1849,17 +1852,187 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         }
         ctx.restore();
       }
+      // Fill this list only after the regions have been chosen. The IDs are the
+      // original Figma SVG groups, e.g. {id:'RU-MOW',lane:0}. No demo regions are enabled.
+      var mapRegionSelection=[];
+      var mapImage=new Image(),mapDocument=null,mapLoaded=false,mapLoadError=false;
+      var mapLayers=[],mapLayerKey='',mapRegionImages=[],mapSweep=document.createElement('canvas');
+      var mapReady=Promise.all([
+        new Promise(function(resolve){
+          mapImage.onload=function(){mapLoaded=true;mapLayerKey='';resolve(true);if(typeof update==='function')update();};
+          mapImage.onerror=function(){mapLoadError=true;resolve(false);};
+          mapImage.src='assets/russia-map.svg';
+        }),
+        new Promise(function(resolve){
+          var request=new XMLHttpRequest();
+          request.open('GET','assets/russia-map.svg',true);
+          request.onload=function(){
+            if(request.status===200||(request.status===0&&request.responseText)){
+              var parsed=new DOMParser().parseFromString(request.responseText,'image/svg+xml');
+              if(!parsed.querySelector('parsererror'))mapDocument=parsed;
+            }
+            resolve(!!mapDocument);
+          };
+          request.onerror=function(){resolve(false);};request.send();
+        })
+      ]).then(function(){return loadMapRegions();}).then(function(){update();});
+      function loadMapRegions(){
+        mapRegionImages=[];mapLayerKey='';
+        if(!mapDocument)return Promise.resolve();
+        return Promise.all(mapRegionSelection.map(function(selection){
+          if(!mapDocument.getElementById(selection.id))return Promise.resolve();
+          // Preserve the source paths, masks and viewBox; isolate only the chosen group.
+          var copy=mapDocument.documentElement.cloneNode(true);
+          copy.querySelectorAll('g[id^="RU-"]').forEach(function(group){if(group.id!==selection.id)group.remove();});
+          var blob=new Blob([new XMLSerializer().serializeToString(copy)],{type:'image/svg+xml'});
+          var url=URL.createObjectURL(blob),image=new Image();
+          return new Promise(function(resolve){
+            image.onload=function(){
+              mapRegionImages.push({id:selection.id,lane:Math.max(0,Math.min(2,selection.lane||0)),image:image});
+              URL.revokeObjectURL(url);mapLayerKey='';resolve();
+            };
+            image.onerror=function(){URL.revokeObjectURL(url);resolve();};image.src=url;
+          });
+        }));
+      }
+      function mapFinaleState(index){
+        return {
+          reveal:smoothstep((index-routeEnd+70)/100),
+          handoff:smoothstep((index-routeEnd+65)/100),
+          darkness:smoothstep((index-routeEnd+55)/90),
+          absorb:smoothstep((index-routeEnd-45)/185),
+          charge:smoothstep((index-routeEnd-20)/155),
+          power:smoothstep((index-routeEnd-105)/175)
+        };
+      }
+      function mapLayout(){
+        var w=Math.min(width*(width<700?.90:.72),1177,height*.64*1177/731.722),h=w*731.722/1177;
+        var x=(width-w)*.5,y=height*.40-h*.5;
+        var gap=Math.min(75,Math.max(30,height*.07)),spacing=Math.min(150,width*.13);
+        return {x:x,y:y,w:w,h:h,indicatorY:y+h+gap,spacing:spacing,radius:Math.min(18,Math.max(9,width*.015))};
+      }
+      function mapRaster(source,color,layout){
+        var layer=document.createElement('canvas'),scale=Math.min(dpr,1.5);
+        layer.width=Math.ceil(layout.w*scale);layer.height=Math.ceil(layout.h*scale);
+        var context=layer.getContext('2d');
+        context.drawImage(source,0,0,layer.width,layer.height);
+        // Turn the source's black-filled regions into transparent contour ink.
+        // This is cached on resize/load, so blooms follow coastlines, never a rectangle.
+        var pixels=context.getImageData(0,0,layer.width,layer.height),data=pixels.data;
+        for(var index=0;index<data.length;index+=4){
+          var ink=Math.max(data[index],data[index+1],data[index+2]);
+          data[index+3]=Math.round(data[index+3]*ink/255);
+          data[index]=color[0];data[index+1]=color[1];data[index+2]=color[2];
+        }
+        context.putImageData(pixels,0,0);
+        return layer;
+      }
+      function prepareMapLayers(layout){
+        var key=[layout.w,layout.h,dpr,mapRegionImages.map(r=>r.id+':'+r.lane).join()].join();
+        if(key===mapLayerKey||!mapLoaded)return;
+        mapLayerKey=key;
+        mapLayers=[mapRaster(mapImage,[211,220,229],layout)];
+        mapSweep.width=mapLayers[0].width;mapSweep.height=mapLayers[0].height;
+        for(var color of wireColors)mapLayers.push(mapRaster(mapImage,mixColor(color,[235,250,255],.35),layout));
+        mapRegionImages.forEach(function(region){region.layer=mapRaster(region.image,mixColor(wireColors[region.lane],[235,250,255],.52),layout);});
+      }
+      function strokeScreenPath(points,color,alpha,lineWidth){
+        if(points.length<2||alpha<=0)return;
+        ctx.save();ctx.globalAlpha=alpha;ctx.strokeStyle=color;ctx.lineWidth=lineWidth;
+        ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();
+        ctx.moveTo(points[0][0],points[0][1]);
+        for(var index=1;index<points.length;index++)ctx.lineTo(points[index][0],points[index][1]);
+        ctx.stroke();ctx.restore();
+      }
+      function mapCablePoint(lane,t,layout){
+        var x=width*.5+(lane-1)*layout.spacing,startX=width*.5+(lane-1)*Math.min(width*.27,360);
+        var startY=height*1.12,endY=layout.indicatorY,r=1-t;
+        return [r*r*r*startX+3*r*r*t*startX+3*r*t*t*x+t*t*t*x,
+          r*r*r*startY+3*r*r*t*height*.86+3*r*t*t*(endY+height*.16)+t*t*t*endY];
+      }
+      function mapCables(ribbons,state,layout){
+        if(state.absorb>=1)return [[],[],[]];
+        return ribbons.map(function(line,lane){
+          var visible=[];
+          for(var point of line){var p=projectInto(...point,{});if(p.visible)visible.push([p.x,p.y]);}
+          var count=Math.max(2,visible.length),out=[];
+          for(var index=0;index<count;index++){
+            var t=index/(count-1),destination=mapCablePoint(lane,state.absorb+(1-state.absorb)*t,layout);
+            var origin=visible[index]||destination;
+            out.push(origin.map((v,axis)=>v+(destination[axis]-v)*state.handoff));
+          }
+          return out;
+        });
+      }
+      function drawMapContours(state,layout){
+        if(!mapLoaded)return;
+        prepareMapLayers(layout);
+        ctx.save();ctx.globalCompositeOperation='lighter';
+        ctx.globalAlpha=state.reveal*(.14+.72*state.power);
+        ctx.drawImage(mapLayers[0],layout.x,layout.y,layout.w,layout.h);
+        // A single rising wave carries the three currents through the real SVG contours.
+        // The sweep is scroll-driven and settles; it never loops or flashes at rest.
+        if(state.power>0&&state.power<1){
+          for(var lane=0;lane<3;lane++){
+            var wave=layout.y+layout.h*(1.16-state.power*1.42)+lane*layout.h*.045;
+            var band=layout.h*.10,mask=mapSweep.getContext('2d'),scale=mapSweep.height/layout.h;
+            mask.globalCompositeOperation='source-over';mask.clearRect(0,0,mapSweep.width,mapSweep.height);
+            mask.drawImage(mapLayers[lane+1],0,0);
+            var gradient=mask.createLinearGradient(0,(wave-band-layout.y)*scale,0,(wave+band-layout.y)*scale);
+            gradient.addColorStop(0,'rgba(0,0,0,0)');gradient.addColorStop(.5,'rgba(255,255,255,.9)');gradient.addColorStop(1,'rgba(0,0,0,0)');
+            // Use an alpha mask on the cached contour image, never draw a stripe over the map.
+            mask.globalCompositeOperation='destination-in';mask.fillStyle=gradient;mask.fillRect(0,0,mapSweep.width,mapSweep.height);
+            ctx.save();
+            ctx.globalAlpha=Math.sin(state.power*Math.PI)*.65;
+            ctx.shadowColor=rgb(wireColors[lane]);ctx.shadowBlur=10;
+            ctx.drawImage(mapSweep,layout.x,layout.y,layout.w,layout.h);ctx.restore();
+          }
+        }
+        mapRegionImages.forEach(function(region,index){
+          var power=smoothstep((state.power-Math.min(.35,index*.035))/.65);
+          if(!region.layer||power<=0)return;
+          ctx.save();ctx.globalAlpha=power*.38;ctx.shadowColor=rgb(wireColors[region.lane]);ctx.shadowBlur=12;
+          ctx.drawImage(region.layer,layout.x,layout.y,layout.w,layout.h);
+          ctx.shadowBlur=0;ctx.globalAlpha=power;ctx.drawImage(region.layer,layout.x,layout.y,layout.w,layout.h);ctx.restore();
+        });
+        ctx.restore();
+      }
+      function drawMapIndicators(state,layout){
+        for(var lane=0;lane<3;lane++){
+          var x=width*.5+(lane-1)*layout.spacing,y=layout.indicatorY,r=layout.radius;
+          var color=mixColor(wireColors[lane],[220,245,255],.28),power=state.charge;
+          ctx.save();ctx.globalAlpha=state.reveal;ctx.fillStyle='#000';
+          ctx.beginPath();ctx.arc(x,y,r+2,0,Math.PI*2);ctx.fill();
+          ctx.lineWidth=1;ctx.strokeStyle=rgb(mixColor([50,56,66],color,power));ctx.stroke();
+          ctx.beginPath();ctx.arc(x,y,r*.56,0,Math.PI*2);
+          ctx.globalAlpha=state.reveal*(.18+.82*power);ctx.fillStyle=rgb(color);
+          ctx.shadowColor=rgb(color);ctx.shadowBlur=power*19;ctx.fill();
+          ctx.shadowBlur=0;ctx.globalAlpha=state.reveal*(.25+.75*power);ctx.strokeStyle=rgb(mixColor(color,[255,255,255],.6));ctx.lineWidth=.8;
+          ctx.beginPath();ctx.arc(x,y,r*.78,-Math.PI*.85,Math.PI*.85);ctx.stroke();ctx.restore();
+        }
+      }
       function draw(){
-        const i=sceneStart+scrollProgress*(route.length-1-sceneStart),head=at(i);
+        var journeyIndex=sceneStart+scrollProgress*(journeyEnd-sceneStart);
+        const i=Math.min(routeEnd,journeyIndex),head=at(i);
         currentRouteIndex=i;
         camera(i);
         prepareView();
-        drawBackground();drawStreetscape(head);drawHydroScene(head);
-        drawWindField(head,performance.now()/1000);
+        var finale=mapFinaleState(journeyIndex);
+        drawBackground();
+        if(finale.darkness<1){
+          drawStreetscape(head);drawHydroScene(head);
+          drawWindField(head,performance.now()/1000);
+        }
         var ribbons=lanes.map(lane=>buildRibbon(i,lane));
         var time=performance.now()/1000;
-        drawInnerCurrent(ribbons,time);
-        drawCrossingSparks(ribbons,time);
+        if(finale.reveal>0){
+          ctx.save();ctx.globalAlpha=finale.darkness;ctx.fillStyle='#000';ctx.fillRect(0,0,width,height);ctx.restore();
+          var layout=mapLayout();drawMapContours(finale,layout);
+          drawInnerCurrent(mapCables(ribbons,finale,layout),time,true);
+          drawMapIndicators(finale,layout);
+        }else{
+          drawInnerCurrent(ribbons,time);drawCrossingSparks(ribbons,time);
+        }
       }
       function render(time) { draw(time); }
 
@@ -1870,7 +2043,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         scrollProgress+=(target-scrollProgress)*(reduceMotion?1:1-Math.pow(.86,elapsed/(1000/60)));
         if(Math.abs(target-scrollProgress)<.0001)scrollProgress=target;
         draw();
-        if(target!==scrollProgress||(!reduceMotion&&scrollProgress>0))raf=requestAnimationFrame(tick);
+        if(target!==scrollProgress||(!reduceMotion&&scrollProgress>0&&scrollProgress<1))raf=requestAnimationFrame(tick);
         else lastTick=0;
       }
       function update(){target=Math.min(1,Math.max(0,scrollY/Math.max(1,document.documentElement.scrollHeight-innerHeight)));if(!document.hidden&&!raf)raf=requestAnimationFrame(tick)}

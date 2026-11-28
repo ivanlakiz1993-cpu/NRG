@@ -10,13 +10,15 @@ $temp = Join-Path ([IO.Path]::GetTempPath()) ('nrg-scene-' + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $temp | Out-Null
 $source = [IO.File]::ReadAllText((Join-Path $root 'energy-3d-scene.html'))
 $checks = @'
+      (async function(){
+      await mapReady;
       var viewport=location.hash.slice(1).split(',').map(Number);
       document.querySelector('.screen').style.width=viewport[0]+'px';
       document.querySelector('.screen').style.height=viewport[1]+'px';resize();
       cancelAnimationFrame(raf);raf=0;
       var results=[],captures=[];
       function check(condition,name){results.push({name:name,pass:!!condition});}
-      function moveTo(x){var index=nearestRouteIndex(x,-185,originalRouteEnd);scrollProgress=(index-sceneStart)/(route.length-1-sceneStart);draw();}
+      function moveTo(x){var index=nearestRouteIndex(x,-185,originalRouteEnd);scrollProgress=sceneProgressAt(index);draw();}
       try{
         check(width===viewport[0]&&height===viewport[1],'Exact requested canvas viewport');
         prepareFactoryDetails(finalFactory);
@@ -112,14 +114,44 @@ $checks = @'
         check(waterFrames[0]===waterFrames[1],'Reduced motion keeps the canyon and water stable');
         performance.now=realNow;reduceMotion=false;
         moveTo(355);captures.push({name:'dam-ascent',image:canvas.toDataURL('image/png')});
-        scrollProgress=1;draw();captures.push({name:'dam-crest',image:canvas.toDataURL('image/png')});
+        scrollProgress=sceneProgressAt(routeEnd);draw();captures.push({name:'dam-crest',image:canvas.toDataURL('image/png')});
+        check(mapLoaded&&!mapLoadError&&mapImage.naturalWidth===1177,'Original Figma map asset loads with intrinsic dimensions');
+        check(mapDocument&&mapDocument.querySelectorAll('g[id^="RU-"]').length===83,'All original SVG region groups remain addressable');
+        check(mapRegionSelection.length===0&&mapRegionImages.length===0,'No regions are chosen before the user supplies them');
+        var layout=mapLayout();
+        check(layout.x>=0&&layout.x+layout.w<=width&&layout.y>=0&&layout.indicatorY+layout.radius<height,'Map and three indicators fit the viewport');
+        check(Math.abs(layout.w/layout.h-1177/731.722)<.00001,'Figma map keeps its original aspect ratio');
+        scrollProgress=sceneProgressAt(routeEnd+40);draw();captures.push({name:'map-connected',image:canvas.toDataURL('image/png')});
+        var connected=mapCables(lanes.map(l=>buildRibbon(routeEnd,l)),mapFinaleState(routeEnd+40),layout);
+        check(connected.every((line,lane)=>Math.hypot(line[line.length-1][0]-(width*.5+(lane-1)*layout.spacing),line[line.length-1][1]-layout.indicatorY)<.001),'Each conductor terminates at its own indicator');
+        scrollProgress=sceneProgressAt(routeEnd+150);draw();captures.push({name:'map-charging',image:canvas.toDataURL('image/png')});
+        var receiving=mapCables(lanes.map(l=>buildRibbon(routeEnd,l)),mapFinaleState(routeEnd+150),layout);
+        check(receiving.every((line,lane)=>line[0][1]<connected[lane][0][1]),'Cable tails move upward into the indicators during absorption');
+        scrollProgress=1;draw();captures.push({name:'map-powered',image:canvas.toDataURL('image/png')});
+        check(mapCables(lanes.map(l=>buildRibbon(routeEnd,l)),mapFinaleState(journeyEnd),layout).every(line=>line.length===0),'All three cables are fully absorbed at the final frame');
+        check(mapFinaleState(journeyEnd).power===1&&mapFinaleState(journeyEnd).charge===1,'Map and all indicators retain power at the end');
+        var inkContext=mapLayers[0].getContext('2d'),blank=inkContext.getImageData(0,0,1,1).data;
+        check(blank[3]===0,'Contour bloom has transparent surroundings rather than an opaque rectangle');
+        target=scrollProgress;tick(performance.now());
+        check(raf===0,'Settled powered map stops requesting idle animation frames');
+        reduceMotion=true;draw();var powered=canvas.toDataURL();draw();
+        check(canvas.toDataURL()===powered,'Powered map stays stable in reduced-motion mode');reduceMotion=false;
+        // Exercise real region isolation, then restore the empty user selection.
+        mapRegionSelection=[{id:'RU-MOW',lane:0},{id:'RU-SAK',lane:2}];await loadMapRegions();draw();
+        check(mapRegionImages.length===2&&mapRegionImages.every(r=>r.image.naturalWidth===1177&&r.layer),'Selected regions render from the original SVG groups');
+        captures.push({name:'map-region-check',image:canvas.toDataURL('image/png')});
+        mapRegionSelection=[];await loadMapRegions();
+        scrollProgress=sceneProgressAt(routeEnd+40);draw();
+        check(mapCables(lanes.map(l=>buildRibbon(routeEnd,l)),mapFinaleState(routeEnd+40),layout).every(line=>line.length>0),'Reverse scroll restores the absorbed conductors');
         moveTo(242);check(buildStrokeTrace(hydroPaths[0].points).hasVisibleSamples,'Reverse travel restores the canyon shoreline');
       }catch(error){results.push({name:error.stack,pass:false});}
       var output=document.createElement('pre');output.id='scene-check-results';output.textContent=JSON.stringify({results:results,captures:captures});document.body.appendChild(output);
+      })();
 '@
 $source = $source.Replace('    })();', $checks + "`n    })();")
 # Capture script-level errors even if initialization fails before the test hook.
-$source = $source.Replace('<head>', '<head><script>window.onerror=function(message){document.documentElement.setAttribute("data-scene-error",message);};</script>')
+$assetBase=([Uri]($root+'\')).AbsoluteUri
+$source = $source.Replace('<head>', '<head><base href="'+$assetBase+'"><script>window.onerror=function(message){document.documentElement.setAttribute("data-scene-error",message);};</script>')
 $file = Join-Path $temp 'scene-check.html'
 [IO.File]::WriteAllText($file,$source,[Text.UTF8Encoding]::new($false))
 foreach ($size in $Sizes) {

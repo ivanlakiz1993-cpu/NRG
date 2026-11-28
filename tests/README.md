@@ -13,6 +13,15 @@ the entrance, workshop, exit, river, canyon, dam outlets, ascent and crest at
 390, 1024 and 1920 CSS pixels. Canyon checks cover solid dam occlusion,
 clearance of the central ascent, visible outlet jets, flowing water at a stationary
 camera, reverse travel and a stable reduced-motion state.
+The final-map checks also verify the local Figma SVG, original region IDs and
+aspect ratio, the three cable endpoints, complete cable absorption, the stopped
+animation loop at the final frame and isolated region illumination. A temporary
+region selection is used only inside the test, then cleared. The production
+`mapRegionSelection` array in `energy-3d-scene.html` stays empty until regions are
+chosen; entries use the source SVG group IDs and a cable colour index, for example
+`{id:'RU-MOW',lane:0}` (0 blue, 1 indigo, 2 green). The source asset is
+`assets/russia-map.svg`, exported from the Figma “Карта” frame without changing
+its paths or dimensions.
 
 `compare-scene.ps1` loads the original scene from Git (`86e1636` by default),
 renders both versions with an identical clock, and compares 15 frames per
