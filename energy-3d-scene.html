@@ -430,6 +430,9 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         var faces=[],x=building.x,z=building.z,w=building.w,d=building.depth,h=building.h;
         function prism(footprint,y0,tops,detail){
           if(typeof tops==='number')tops=footprint.map(()=>tops);
+          var footprintWidth=Math.max(...footprint.map(p=>p[0]))-Math.min(...footprint.map(p=>p[0]));
+          var footprintDepth=Math.max(...footprint.map(p=>p[1]))-Math.min(...footprint.map(p=>p[1]));
+          var isMainFactoryHall=building.final&&y0<.1&&footprintWidth>45&&footprintDepth>90&&Math.max(...tops)<=20.1;
           var bottom=footprint.map(p=>[x+p[0],y0,z+p[1]]),top=footprint.map((p,i)=>[x+p[0],tops[i],z+p[1]]);
           var centre=[x+footprint.reduce((n,p)=>n+p[0],0)/footprint.length,(y0+Math.max(...tops))*.5,z+footprint.reduce((n,p)=>n+p[1],0)/footprint.length];
           function face(points,windows){
@@ -444,7 +447,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             var j=(i+1)%footprint.length,points=[bottom[i],bottom[j],top[j],top[i]],windows=[];
             var span=Math.hypot(bottom[j][0]-bottom[i][0],bottom[j][2]-bottom[i][2]);
             var isFactoryPortal=building.final&&detail&&y0<.1&&span>35&&Math.max(...tops)>15&&Math.abs(bottom[i][2]-bottom[j][2])<.001&&(Math.abs(bottom[i][2]-z)<.08||Math.abs(bottom[i][2]-(z-100))<.08);
-            if(detail&&span>.55&&(!building.final||isFactoryPortal)){
+            if(detail&&span>.55&&(!isMainFactoryHall||span>1.5)){
               var windowStyle=building.final?2:building.variant%4;
               var rows=Math.max(1,Math.floor((Math.min(tops[i],tops[j])-y0-.7)/(building.final?4.8:windowStyle===3?2.7:2.1)));
               var cols=Math.max(1,Math.floor(span/(windowStyle===2?3.2:windowStyle===1?1.25:1.8)));
