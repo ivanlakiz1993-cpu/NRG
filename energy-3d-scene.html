@@ -1147,18 +1147,30 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           panel([[21.5,0,-97],[21.5,19.8,-97],[21.5,19.8,-3],[21.5,0,-3]],.55,'#000000');
           // Black barrel roof closes the gap above the side walls; only eaves and ridge are outlined.
           var roofProfile=[[-28.5,19.8],[-16,25.2],[-3.5,27.2],[9,25.2],[21.5,19.8]];
+          function workshopRoofY(x){
+            for(var i=0;i<roofProfile.length-1;i++){
+              var a=roofProfile[i],b=roofProfile[i+1];
+              if(x>=a[0]&&x<=b[0])return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]);
+            }
+            return 19.8;
+          }
           for(var roofSection=0;roofSection<roofProfile.length-1;roofSection++){
             var roofA=roofProfile[roofSection],roofB=roofProfile[roofSection+1];
             panel([[roofA[0],roofA[1],-3],[roofB[0],roofB[1],-3],[roofB[0],roofB[1],-97],[roofA[0],roofA[1],-97]],.54,'#000000');
           }
           for(var roofRail of [roofProfile[0],roofProfile[2],roofProfile[4]])line([[roofRail[0],roofRail[1],-3],[roofRail[0],roofRail[1],-97]],.56,.72);
           line(roofProfile.map(function(point){return [point[0],point[1],-6];}),.57,.86);
+          // Eave beams and transverse roof ribs make the wall-to-ceiling junction readable from inside.
+          frameBox(-28.85,-27.95,19.35,20.15,-3,-97,.55,.72,'#000000');
+          frameBox(20.95,21.85,19.35,20.15,-3,-97,.55,.72,'#000000');
+          for(var ribZ of [-6,-50,-94])line(roofProfile.map(function(point){return [point[0],point[1]-.12,ribZ];}),.56,.72);
           // Interior glazing stays dark; these panes are never passed through the light sequence.
           for(var wallX of [-28.47,21.53]){
             for(var windowRow=0;windowRow<2;windowRow++){
               var windowY=windowRow?14.15:10.15;
               for(var windowZ=-8;windowZ>=-92;windowZ-=12){
                 var interiorWindow=[[wallX,windowY,windowZ-3.2],[wallX,windowY,windowZ+3.2],[wallX,windowY+2.2,windowZ+3.2],[wallX,windowY+2.2,windowZ-3.2]];
+                panel(interiorWindow,.55,'#000000');
                 line(interiorWindow.concat([interiorWindow[0]]),.56,.72);
               }
             }
@@ -1181,8 +1193,9 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             var lampZ=-16-Math.floor(lampIndex/2)*34,lampX=lampIndex%2?5:-12;
             var fixtureY=16.2,halfWidth=.78,halfDepth=2.25;
             frameBox(lampX-halfWidth,lampX+halfWidth,fixtureY,fixtureY+.62,lampZ+halfDepth,lampZ-halfDepth,.08,.78,'#000000');
-            line([[lampX-.44,21.45,lampZ],[lampX-.44,fixtureY+.6,lampZ]],.08,.68);
-            line([[lampX+.44,21.45,lampZ],[lampX+.44,fixtureY+.6,lampZ]],.08,.68);
+            var mountY=workshopRoofY(lampX)-.18;
+            line([[lampX-.44,mountY,lampZ],[lampX-.44,fixtureY+.6,lampZ]],.08,.68);
+            line([[lampX+.44,mountY,lampZ],[lampX+.44,fixtureY+.6,lampZ]],.08,.68);
             var lampPoints=[-.28,.28].map(function(offset){var x0=lampX+offset-.16,x1=lampX+offset+.16;return [[x0,fixtureY-.015,lampZ-halfDepth+.16],[x1,fixtureY-.015,lampZ-halfDepth+.16],[x1,fixtureY-.015,lampZ+halfDepth-.16],[x0,fixtureY-.015,lampZ+halfDepth-.16]].map(worldPoint);});
             var ceilingGlow=[[lampX-3,fixtureY-.01,lampZ-4],[lampX+3,fixtureY-.01,lampZ-4],[lampX+3,fixtureY-.01,lampZ+4],[lampX-3,fixtureY-.01,lampZ+4]];
             building.interiorLamps.push({points:lampPoints,glow:ceilingGlow.map(worldPoint),lightOn:true,lightOpacity:.9,lightDelay:0,lightFlicker:false,lightOnset:-1});
