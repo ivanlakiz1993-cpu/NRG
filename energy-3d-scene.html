@@ -544,6 +544,12 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           roundBox(-42,-29,0,14,3,-18,3,true);
           roundBox(22,33,0,36,-4,-24,2.4,true);
           roundBox(-7,8,20,33,-14,-29,3.4,true);
+          // Two short landing shelves stay within the marked wall-to-door runs.
+          box(-28.5,-8.2,5.8,6.2,2.3,-1,false);
+          box(8.2,21.5,5.8,6.2,2.3,-1,false);
+          // Slim columns support the outer edge of each shelf without extending past the walls.
+          for(var supportX of [-27,-22,-17,-12,-8.8])box(supportX-.16,supportX+.16,0,5.8,2.3,2.0,false);
+          for(var supportX of [8.8,13,18,21])box(supportX-.16,supportX+.16,0,5.8,2.3,2.0,false);
           for(var stack=0;stack<2;stack++){
             var sx=-20+stack*6,foot=[];
             for(var k=0;k<24;k++){var angle=k/24*Math.PI*2;foot.push([sx+Math.cos(angle)*1.15,-22+Math.sin(angle)*1.15]);}
@@ -1328,9 +1334,9 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           for(var railX=-6;railX<=6;railX+=2)line([[railX,6.3,6.3],[railX,7.1,6.3]],.68,.45,undefined,true);
           // Extend the rails toward both side walls and add evenly spaced uprights.
           for(var railSide of [-1,1]){
-            var railStart=railSide<0?-26:6,railEnd=railSide<0?-6:26;
+            var railStart=railSide<0?-28.5:8.2,railEnd=railSide<0?-8.2:21.5;
             for(var railY of [6.4,6.75,7.1])line([[railStart,railY,6.3],[railEnd,railY,6.3]],.6,.85,undefined,true);
-            for(var railX=railStart;railX<=railEnd;railX+=2)line([[railX,6.3,6.3],[railX,7.1,6.3]],.68,.45,undefined,true);
+            for(var railX=railStart;railX<=railEnd;railX+=2.5)line([[railX,6.3,6.3],[railX,7.1,6.3]],.68,.45,undefined,true);
           }
           // Restore vessel access ladders and roof safety rails around both tanks.
           for(var tank=0;tank<2;tank++){
