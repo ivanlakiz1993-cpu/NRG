@@ -589,14 +589,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           var vesselRings=[[20,.25],[21,1.8],[23,2],[33,2],[35,1.8],[36,.25]].map(p=>Array.from({length:32},(_,k)=>{var a=k/32*Math.PI*2;return [20+Math.cos(a)*p[1],3.6+Math.sin(a)*p[1],p[0]];}));
           curvedSkin(vesselRings,[20,3.6,28]);
           for(var sz of [24,32])box(18.5,21.5,0,1.85,sz+.5,sz-.5,false);
-          // Separate longitudinal racks frame the turn without spanning the central passage.
-          for(var sx of [-15,15]){
-            for(var sz of [36,46,56,66])box(sx-.18,sx+.18,0,7,sz+.18,sz-.18,false);
-            box(sx-.35,sx+.35,6.7,7.1,66.2,35.8,false);
-          }
-          // Elevated pipe rack set in front of the hall, with a clear central entrance.
-          for(var sx of [-25,-15,15,25])box(sx-.18,sx+.18,0,5.8,6.6,6.1,false);
-          box(-26,-6,5.5,5.8,6.8,5.9,false);box(6,26,5.5,5.8,6.8,5.9,false);
         }else if(building.variant===0){
           // Terraced residential building: three real setbacks, not a box with a roof ornament.
           box(-w*.5,w*.5,0,h*.46,0,-d);
@@ -1154,8 +1146,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
         if(!building.detailPaths){
           var paths=[],panels=[];
           function worldPoint(p){return [84-p[2],p[1],-185+p[0]];}
-          function line(points,stage,weight,alpha){paths.push({points:points.map(worldPoint),stage:stage,weight:weight||.65,alpha:alpha===undefined?1:alpha});}
-          function panel(points,stage,color){panels.push({points:points.map(worldPoint),stage:stage,color:'#000000'});}
+          function line(points,stage,weight,alpha){if(points.every(function(point){return point[2]>.15;}))return;paths.push({points:points.map(worldPoint),stage:stage,weight:weight||.65,alpha:alpha===undefined?1:alpha});}
+          function panel(points,stage,color){if(points.every(function(point){return point[2]>.15;}))return;panels.push({points:points.map(worldPoint),stage:stage,color:'#000000'});}
           function ring(x,y,z,r,stage){var points=[];for(var k=0;k<=16;k++){var angle=k/16*Math.PI*2;points.push([x+Math.cos(angle)*r,y,z+Math.sin(angle)*r]);}line(points,stage,.65);}
           // A continuous workshop shell: dark floor and inward-facing walls, with an open drive-through aisle.
           panel([[-28.5,0,-.15],[21.5,0,-.15],[21.5,0,-99.85],[-28.5,0,-99.85]],.5,'#000000');
