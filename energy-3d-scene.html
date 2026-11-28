@@ -1335,7 +1335,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           // Restore vessel access ladders and roof safety rails around both tanks.
           for(var tank=0;tank<2;tank++){
             var tankX=39+tank*9,tankTop=11+tank*2;
-            for(var tankY of [.4,tankTop*.4,tankTop*.75,tankTop])ring(tankX,tankY,-9,3.44,.6);
             ring(tankX,tankTop+1.05,-9,3.2,.7);
             for(var railPost=0;railPost<12;railPost++){
               var railAngle=railPost/12*Math.PI*2;
