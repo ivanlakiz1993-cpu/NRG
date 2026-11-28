@@ -658,7 +658,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
       });
       // The river leads out of the hall to a wide hydroelectric dam.
       var hydroPanels=[],hydroPaths=[];
-      function hydroPanel(points,color){hydroPanels.push({points:points,color:color});}
+      function hydroPanel(points,color){hydroPanels.push({points:points,color:'#000000'});}
       function hydroLine(points,weight,alpha){hydroPaths.push({points:points,weight:weight||.75,alpha:alpha===undefined?1:alpha});}
       function damFaceX(z,y){return 349+.0013*(z+185)*(z+185)+11*y/56;}
       function damFront(z,y,offset){return [damFaceX(z,y)-(offset||0),y,z];}
@@ -1164,7 +1164,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           var paths=[],panels=[];
           function worldPoint(p){return [84-p[2],p[1],-185+p[0]];}
           function line(points,stage,weight,alpha){paths.push({points:points.map(worldPoint),stage:stage,weight:weight||.65,alpha:alpha===undefined?1:alpha});}
-          function panel(points,stage,color){panels.push({points:points.map(worldPoint),stage:stage,color:color});}
+          function panel(points,stage,color){panels.push({points:points.map(worldPoint),stage:stage,color:'#000000'});}
           function ring(x,y,z,r,stage){var points=[];for(var k=0;k<=48;k++){var angle=k/48*Math.PI*2;points.push([x+Math.cos(angle)*r,y,z+Math.sin(angle)*r]);}line(points,stage,.65);}
           building.powerBranches=[];
           // A continuous workshop shell: dark floor and inward-facing walls, with an open drive-through aisle.
@@ -1435,7 +1435,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             for(var dx of [-.24,0,.24])line([[sx+dx,7.35,36],[sx+dx,7.35,66]],.35,.7);
             for(var sz of [36,46,56,66]){
               line([[sx-.6,7.1,sz],[sx+.6,7.1,sz]],.4,.6);
-              line([[sx,0,sz],[sx,2.5,sz+2]],.5,.45);
             }
           }
           // Louvred compressor intake and three motor housings outside the pump station.
