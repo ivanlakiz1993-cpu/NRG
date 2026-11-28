@@ -1164,26 +1164,24 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           var paths=[],panels=[];
           function worldPoint(p){return [84-p[2],p[1],-185+p[0]];}
           function line(points,stage,weight,alpha){paths.push({points:points.map(worldPoint),stage:stage,weight:weight||.65,alpha:alpha===undefined?1:alpha});}
-          function panel(points,stage,color){panels.push({points:points.map(worldPoint),stage:stage,color:'#000000'});}
+          function panel(points,stage,color){panels.push({points:points.map(worldPoint),stage:stage,color:color||'#000000'});}
           function ring(x,y,z,r,stage){var points=[];for(var k=0;k<=48;k++){var angle=k/48*Math.PI*2;points.push([x+Math.cos(angle)*r,y,z+Math.sin(angle)*r]);}line(points,stage,.65);}
           building.powerBranches=[];
           // A continuous workshop shell: dark floor and inward-facing walls, with an open drive-through aisle.
-          panel([[-28.5,0,-.15],[21.5,0,-.15],[21.5,0,-99.85],[-28.5,0,-99.85]],.5,'#080808');
-          panel([[-28.5,0,-3],[-28.5,19.8,-3],[-28.5,19.8,-97],[-28.5,0,-97]],.55,'#0b0b0b');
-          panel([[21.5,0,-97],[21.5,19.8,-97],[21.5,19.8,-3],[21.5,0,-3]],.55,'#0b0b0b');
+          panel([[-28.5,0,-.15],[21.5,0,-.15],[21.5,0,-99.85],[-28.5,0,-99.85]],.5,'#000000');
+          panel([[-28.5,0,-3],[-28.5,19.8,-3],[-28.5,19.8,-97],[-28.5,0,-97]],.55,'#000000');
+          panel([[21.5,0,-97],[21.5,19.8,-97],[21.5,19.8,-3],[21.5,0,-3]],.55,'#000000');
           for(var bayZ=-8;bayZ>=-96;bayZ-=12){
             for(var columnX of [-26.5,20]){
               frameBox(columnX-.22,columnX+.22,.1,19.7,bayZ+.22,bayZ-.22,.58,.85);
-              line([[columnX,14.5,bayZ],[columnX+(columnX<0?2:-2),16,bayZ]],.64,.7);
             }
-            line([[-26.5,.04,bayZ],[20,.04,bayZ]],.7,.4,.25);
           }
           // Three cables share a shallow, protected service channel from entrance to exit.
           for(var trayX of [-2.35,2.35]){
             line([[trayX,.12,8],[trayX,.12,-108]],.58,1,.85);
             line([[trayX,.02,8],[trayX,.02,-108]],.62,.5,.6);
           }
-          for(var trayZ=6;trayZ>=-106;trayZ-=3)line([[-2.35,.08,trayZ],[2.35,.08,trayZ]],.64,.45,.45);
+          for(var trayZ=6;trayZ>=-106;trayZ-=15)line([[-2.35,.08,trayZ],[2.35,.08,trayZ]],.64,.45,.45);
           // Low-voltage feeders leave the channel at each production bay, never across the camera path.
           for(var feed of [[-7,-16],[19,-36],[-8,-53],[19,-77]]){
             var fx=feed[0],fz=feed[1],side=fx<0?-1:1;
@@ -1203,54 +1201,24 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               var leaf=[[hingeX,0,portalZ],[freeX,0,leafEnd],[freeX,6.35,leafEnd],[hingeX,6.35,portalZ]];
               panel(leaf,.6,"rgb(28,28,28)");
               line(leaf.concat([leaf[0]]),.62,1);
-              for(var ribY of [1.15,3.15,5.2]){
-                line([[hingeX,ribY,portalZ],[freeX,ribY,leafEnd]],.7,.5);
-              }
             }
             line([[-8.2,.12,portalZ],[8.2,.12,portalZ]],.7,.6);
           }
-          // Curved long-span roof ribs, rather than a triangular or rectangular cap.
-          for(var z=-1.98;z>=-97.98;z-=14){
-            var points=[];for(var k=0;k<=48;k++){var angle=k/48*Math.PI;points.push([-3.5-24.5*Math.cos(angle),20+9*Math.sin(angle),z]);}
-            line(points,.55,.85);
-          }
-          // Sparse arched roof frames align with the shell and leave a clear ceiling silhouette.
+          // Three clean, low-poly roof frames keep the hall readable without a wire grid.
           function roofHeightAt(x){return 20+9*Math.sqrt(Math.max(0,1-Math.pow((x+3.5)/24.5,2)));}
-          for(var bay=-12;bay>=-92;bay-=20){
+          for(var bay of [-12,-52,-92]){
             var arch=[];
-            for(var archX=-25;archX<=20;archX+=2.5)arch.push([archX,roofHeightAt(archX)-.55,bay]);
-            line(arch,.48,.58);
-            line([[-25,20.9,bay],[20,20.9,bay]],.42,.5);
+            for(var archX=-25;archX<=20;archX+=5)arch.push([archX,roofHeightAt(archX)-.55,bay]);
+            line(arch,.48,.48);
           }
-          // Four longitudinal beams make the roof span legible without a dense wire grid.
-          for(var purlinX of [-16,-6,6,16]){
-            var purlinY=roofHeightAt(purlinX)-.25;
-            line([[purlinX,purlinY,-5],[purlinX,purlinY,-95]],.38,.56);
-          }
-          // Twin crane runways and one overhead bridge crane, like a real machine-shop bay.
-          for(var craneSide of [-1,1]){
-            var railX=craneSide<0?-25:19;
-            line([[railX,15,-7],[railX,15,-93]],.5,.8);
-            line([[railX-craneSide*.7,14.5,-7],[railX-craneSide*.7,14.5,-93]],.48,.62);
-            for(var supportZ=-12;supportZ>=-92;supportZ-=20){
-              line([[railX,15,supportZ],[railX,19,supportZ],[railX-craneSide*1.2,22,supportZ]],.52,.65);
-            }
-          }
-          for(var craneZ of [-55,-58]){
-            line([[-25,16.6,craneZ],[19,16.6,craneZ],[19,15,craneZ],[-25,15,craneZ],[-25,16.6,craneZ]],.7,.92);
-            for(var webX=-23;webX<16;webX+=3){
-              line([[webX,16.55,craneZ],[webX+3,15.05,craneZ]],.72,.56);
-              line([[webX,15.05,craneZ],[webX+3,16.55,craneZ]],.72,.56);
-            }
-          }
-          frameBox(-2.2,2.2,16.7,17.5,-55.5,-57.5,.74,.72);
-          line([[0,16.7,-56.5],[0,10.2,-56.5],[0,8.9,-56.1],[.45,8.4,-55.8]],.76,.78);
-          for(var chainX of [-.55,.55])line([[chainX,16.8,-56.4],[chainX,10.7,-56.4]],.76,.5);
+          // One solid bridge crane replaces the crossed wireframe trusses.
+          frameBox(-24,18,15,16.5,-55.5,-57.5,.74,.62,'#141414');
+          line([[0,15,-56.5],[0,10.2,-56.5],[.3,9.2,-56.5]],.76,.7);
           building.interiorLamps=[];
-          for(var lampIndex=0;lampIndex<9;lampIndex++){
-            var lampZ=-9-lampIndex*10,lampX=lampIndex%2?2.4:-2.4;
-            var fixtureY=13.8;
-            for(var suspensionZ of [lampZ-1.7,lampZ+1.7])line([[lampX,roofHeightAt(lampX)-.7,suspensionZ],[lampX,fixtureY+.25,suspensionZ]],.54,.62);
+          for(var lampIndex=0;lampIndex<7;lampIndex++){
+            var lampZ=-10-lampIndex*13.5,lampX=lampIndex%2?2.4:-2.4;
+            var fixtureY=roofHeightAt(lampX)-2.4;
+            line([[lampX,roofHeightAt(lampX)-.25,lampZ],[lampX,fixtureY+.25,lampZ]],.54,.48);
             line([[lampX-.48,fixtureY,lampZ-2.8],[lampX+.48,fixtureY,lampZ-2.8],[lampX+.48,fixtureY,lampZ+2.8],[lampX-.48,fixtureY,lampZ+2.8],[lampX-.48,fixtureY,lampZ-2.8]],.62,.9);
             line([[lampX-.38,fixtureY-.08,lampZ-2.45],[lampX+.38,fixtureY-.08,lampZ-2.45],[lampX+.38,fixtureY-.08,lampZ+2.45],[lampX-.38,fixtureY-.08,lampZ+2.45],[lampX-.38,fixtureY-.08,lampZ-2.45]],.72,.82);
             building.interiorLamps.push([84-lampZ,fixtureY-.08,-185+lampX]);
@@ -1271,7 +1239,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           }
           function floorZone(left,right,front,back,stage){
             line([[left,.08,front],[right,.08,front],[right,.08,back],[left,.08,back],[left,.08,front]],stage,.48,.62);
-            for(var stripe=left+.35;stripe<right-.15;stripe+=.8)line([[stripe,.09,front-.12],[Math.min(right-.1,stripe+.42),.09,front-.72]],stage,.42,.48);
+            for(var stripe=left+1.2;stripe<right-.15;stripe+=2.8)line([[stripe,.09,front-.12],[Math.min(right-.1,stripe+.42),.09,front-.72]],stage,.42,.38);
           }
           function machineBay(left,right,front,back,height,stage){
             // Solid housings participate in depth: no far-side outlines visible through a machine.
@@ -1306,6 +1274,14 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           machineBay(14,20,-13,-29,7,.69);
           machineBay(-23,-16,-31,-46,7.2,.73);
           machineBay(14,20,-73,-90,6.6,.91);
+          // A compact articulated service robot adds a clear, faceted 3D silhouette beside the aisle.
+          frameBox(-14.8,-10.2,.12,.85,-34,-39,.76,.58,'#111111');
+          frameBox(-13.2,-12.2,.85,3.35,-36,-37.5,.78,.66,'#171717');
+          frameBox(-13.4,-9.7,3.05,3.85,-36.3,-37.2,.8,.7,'#1d1d1d');
+          frameBox(-10.1,-9.4,2.1,3.2,-36.45,-37.05,.82,.68,'#121212');
+          ring(-12.7,3.45,-36.75,.46,.82);
+          line([[-14.2,3.55,-36.76],[-13.45,3.55,-36.76]],.83,.64);
+          for(var robotVent=0;robotVent<3;robotVent++)line([[-14.3,.38+robotVent*.13,-34.04],[-12.8,.38+robotVent*.13,-34.04]],.84,.42);
           // CNC machining center: enclosed work area, tool head, table and operator panel.
           frameBox(-16,-8,.2,5.4,-13,-24,.83,.9,'#1b1b1b');
           frameBox(-15.2,-8.8,1,4.8,-13.15,-13.45,.9,.6,'#292929');
