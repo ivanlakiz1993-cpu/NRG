@@ -1332,6 +1332,12 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           // Central guardrail above the clear vehicle opening; no shelf underneath.
           for(var railY of [6.4,6.75,7.1])line([[-6,railY,6.3],[6,railY,6.3]],.6,.85,undefined,true);
           for(var railX=-6;railX<=6;railX+=2)line([[railX,6.3,6.3],[railX,7.1,6.3]],.68,.45,undefined,true);
+          // Extend the rails toward both side walls and add evenly spaced uprights.
+          for(var railSide of [-1,1]){
+            var railStart=railSide<0?-26:6,railEnd=railSide<0?-6:26;
+            for(var railY of [6.4,6.75,7.1])line([[railStart,railY,6.3],[railEnd,railY,6.3]],.6,.85,undefined,true);
+            for(var railX=railStart;railX<=railEnd;railX+=2)line([[railX,6.3,6.3],[railX,7.1,6.3]],.68,.45,undefined,true);
+          }
           // Restore vessel access ladders and roof safety rails around both tanks.
           for(var tank=0;tank<2;tank++){
             var tankX=39+tank*9,tankTop=11+tank*2;
