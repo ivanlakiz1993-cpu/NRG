@@ -466,6 +466,19 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             var isFactoryPortal=building.final&&detail&&y0<.1&&span>35&&Math.max(...tops)>15&&Math.abs(bottom[i][2]-bottom[j][2])<.001&&(Math.abs(bottom[i][2]-z)<.08||Math.abs(bottom[i][2]-(z-100))<.08);
             if(isFactoryPortal){
               var portalHalf=8.2,portalHeight=6.6,leftX=Math.min(bottom[i][0],bottom[j][0]),rightX=Math.max(bottom[i][0],bottom[j][0]),wallZ=bottom[i][2];
+              // Three larger panes per row sit clear of the portal's full-height uprights.
+              windows=[];
+              var facadeZones=[[leftX+1,-9.35],[-7.05,7.05],[9.35,rightX-1]];
+              for(var facadeRow=0;facadeRow<2;facadeRow++)facadeZones.forEach(function(zone,zoneIndex){
+                var zoneWidth=zone[1]-zone[0];
+                if(zoneWidth<5)return;
+                var paneInset=zoneWidth*.075,wx0=zone[0]+paneInset,wx1=zone[1]-paneInset;
+                var wy=facadeRow?14.2:9.05,wh=2.75;
+                var lightSeed=building.seed*31+facadeRow*7.3+zoneIndex*1.9,shade=windowRandom(lightSeed),choice=shade<.42?0:shade<.72?1:shade<.9?2:3;
+                windows.push({points:[[wx0,wy,wallZ],[wx1,wy,wallZ],[wx1,wy+wh,wallZ],[wx0,wy+wh,wallZ]],row:facadeRow,col:zoneIndex,style:2,
+                  lightColor:windowLightColors[choice],lightOpacity:.52+windowRandom(lightSeed+3.1)*.4,
+                  lightDelay:.05+windowRandom(lightSeed+8.7)*.35,lightOn:true,lightFlicker:false,lightOnset:-1});
+              });
               var sections=[[leftX,-portalHalf,y0,Math.max(...tops)],[portalHalf,rightX,y0,Math.max(...tops)],[-portalHalf,portalHalf,portalHeight,Math.max(...tops)]];
               sections.forEach(function(section){
                 // Each section owns its glazing: shared panes used to be rotated twice.
@@ -1167,9 +1180,9 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           // Interior glazing stays dark; these panes are never passed through the light sequence.
           for(var wallX of [-28.47,21.53]){
             for(var windowRow=0;windowRow<2;windowRow++){
-              var windowY=windowRow?14.15:10.15;
-              for(var windowZ=-8;windowZ>=-92;windowZ-=12){
-                var interiorWindow=[[wallX,windowY,windowZ-3.2],[wallX,windowY,windowZ+3.2],[wallX,windowY+2.2,windowZ+3.2],[wallX,windowY+2.2,windowZ-3.2]];
+              var windowY=windowRow?14.1:9;
+              for(var windowZ of [-17,-37,-63,-83]){
+                var interiorWindow=[[wallX,windowY,windowZ-7],[wallX,windowY,windowZ+7],[wallX,windowY+3,windowZ+7],[wallX,windowY+3,windowZ-7]];
                 panel(interiorWindow,.55,'#000000');
                 line(interiorWindow.concat([interiorWindow[0]]),.56,.72);
               }
