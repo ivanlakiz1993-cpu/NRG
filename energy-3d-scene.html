@@ -1223,9 +1223,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               panel([[x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1]],stage,solid);
             }
           }
-          // Black base skirting draws a continuous wall-to-floor seam along both side walls.
-          frameBox(-28.66,-28.34,.02,.24,-3,-97,.56,.78,'#000000');
-          frameBox(21.34,21.66,.02,.24,-3,-97,.56,.78,'#000000');
           function cncLathe(left,right,front,back,height,stage){
             // Enclosed turning centre: sliding window, spindle chuck, tool turret and controls.
             frameBox(left-.15,right+.15,.12,.72,front+.25,back-.25,stage,.62,'#000000');
