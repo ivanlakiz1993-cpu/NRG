@@ -1131,32 +1131,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           var p=pane.points,mid=(a,b)=>a.map((v,i)=>(v+b[i])*.5);
           strokePath3D([mid(p[0],p[1]),mid(p[3],p[2])],rgb(contourBase),.65,.65);
         });
-        active.forEach(building=>drawPlotDetails(building,head,lightNow));
-      }
-      function drawPlotDetails(building,head,lightNow){
-        if(building.final){drawFactoryDetails(building,head,lightNow);return;}
-        var grow=drawingProgress(building,head),ahead=building.routeIndex===undefined?head[2]-building.z:building.routeIndex-currentRouteIndex;
-        var detailTail=building.routeEndIndex===undefined?ahead:routeDistances[building.routeEndIndex]+cameraTrailDistance-routeDistanceAt(currentRouteIndex);
-        if(grow<=0||ahead>45||detailTail<(building.routeEndIndex===undefined?-18:-10))return;
-        var leave=buildingLeave(building,ahead),x=building.x,z=building.z,w=building.w,d=building.depth;
-        var bounds=building.bounds,front=bounds.maxZ,paths=[];
-        function detail(points,stage,weight,alpha){paths.push({points:points,stage:stage,weight:weight||.65,alpha:alpha===undefined?1:alpha})}
-        if(building.variant===2||building.variant>=6){
-          // Service ladders and external pipework distinguish industrial plots.
-          var lx=bounds.maxX-.75,hh=building.h*(building.variant===2?.43:building.variant===6?.34:.18)-.4;
-          for(var dx of [0,.35])detail([[lx+dx,0,front+.08],[lx+dx,hh+.35,front+.08]],.3,.5);
-          for(var y=.3;y<hh+.35;y+=.4)detail([[lx,y,front+.08],[lx+.35,y,front+.08]],.5,.4);
-          for(var y of [hh*.55,hh*.55+.15])detail([[x-w*.65,y,front+.1],[x+w*.48,y,front+.1],[x+w*.48,hh*.85,front+.1]],.4,.6);
-        }
-        // Low plinth and two shallow steps anchor the building to the same ground plane.
-        detail([[x-w*.3,0,front+.7],[x-w*.3,.16,front+.7],[x+w*.3,.16,front+.7],[x+w*.3,0,front+.7]],.12,.55);
-        detail([[x-w*.27,.16,front+.45],[x+w*.27,.16,front+.45]],.2,.45);
-        paths.forEach(function(path){
-          var amount=smoothstep((grow-path.stage)/.3);if(amount<=0)return;
-          var points=partialPath3D(path.points,amount);
-          strokePath3D(points,rgb(contourHalo),leave*.1,1.5);
-          strokePath3D(points,rgb(contourBase),leave*.72*path.alpha,path.weight);
-        });
+        active.forEach(function(building){if(building.final)drawFactoryDetails(building,head,lightNow);});
       }
       function prepareFactoryDetails(building){
         // Geometry is built once, before the architecture depth pass.
@@ -1178,9 +1153,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           // Three cables share a shallow, protected service channel from entrance to exit.
           for(var trayX of [-2.35,2.35]){
             line([[trayX,.12,8],[trayX,.12,-108]],.58,1,.85);
-            line([[trayX,.02,8],[trayX,.02,-108]],.62,.5,.6);
           }
-          for(var trayZ=6;trayZ>=-106;trayZ-=15)line([[-2.35,.08,trayZ],[2.35,.08,trayZ]],.64,.45,.45);
           // Keep the rounded facade continuous; vertical panel seams are omitted.
           for(var y of [6.4,19.5,20])line([[-26,y,.12],[19,y,.12]],.4,.8);
           // Clear, full-height vehicle portals with both door leaves swung into the hall.
@@ -1196,26 +1169,17 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             }
             line([[-8.2,.12,portalZ],[8.2,.12,portalZ]],.7,.6);
           }
-          // Three clean, low-poly roof frames keep the hall readable without a wire grid.
-          function roofHeightAt(x){return 20+9*Math.sqrt(Math.max(0,1-Math.pow((x+3.5)/24.5,2)));}
-          for(var bay of [-12,-52,-92]){
-            var arch=[];
-            for(var archX=-25;archX<=20;archX+=5)arch.push([archX,roofHeightAt(archX)-.55,bay]);
-            line(arch,.48,.48);
-          }
-          // One solid bridge crane replaces the crossed wireframe trusses.
-          frameBox(-24,18,15,16.5,-55.5,-57.5,.74,.62,'#141414');
+          // Wall-mounted luminaires sit below the roof line and stay in the camera view.
           building.interiorLamps=[];
           for(var lampIndex=0;lampIndex<6;lampIndex++){
-            var lampZ=-12-Math.floor(lampIndex/2)*40,lampX=lampIndex%2?19:-26;
-            var fixtureY=22.75,halfWidth=1.25,halfDepth=1.8;
-            var lampPoints=[[lampX-halfWidth,fixtureY,lampZ-halfDepth],[lampX+halfWidth,fixtureY,lampZ-halfDepth],[lampX+halfWidth,fixtureY,lampZ+halfDepth],[lampX-halfWidth,fixtureY,lampZ+halfDepth]];
+            var lampZ=-12-Math.floor(lampIndex/2)*40,lampX=lampIndex%2?21.2:-28.2;
+            var fixtureY=8.4,halfHeight=.58,halfDepth=1.25;
+            var lampPoints=[[lampX,fixtureY-halfHeight,lampZ-halfDepth],[lampX,fixtureY+halfHeight,lampZ-halfDepth],[lampX,fixtureY+halfHeight,lampZ+halfDepth],[lampX,fixtureY-halfHeight,lampZ+halfDepth]];
             line(lampPoints.concat([lampPoints[0]]),.62,.78);
-            line([[lampX-halfWidth,fixtureY-.08,lampZ],[lampX+halfWidth,fixtureY-.08,lampZ]],.72,.62);
-            var roofY=roofHeightAt(lampX)-.35;
-            line([[lampX,roofY,lampZ],[lampX,fixtureY+.08,lampZ]],.54,.42);
-            var ceiling=[[-1.9,-2.2],[1.9,-2.2],[1.9,2.2],[-1.9,2.2]].map(function(offset){var x=lampX+offset[0],z=lampZ+offset[1];return worldPoint([x,roofHeightAt(x)-.02,z]);});
-            building.interiorLamps.push({worldX:84-lampZ,points:lampPoints.map(worldPoint),ceiling:ceiling,lightOn:true,lightOpacity:.9,lightDelay:.08+(lampIndex%3)*.09,lightFlicker:lampIndex===2,lightOnset:-1});
+            line([[lampX,fixtureY,lampZ-.42],[lampX,fixtureY,lampZ+.42]],.72,.62);
+            var wallX=lampX<0?-28.5:21.5;
+            var wall=lampX<0?[[wallX,0,-3],[wallX,19.8,-3],[wallX,19.8,-97],[wallX,0,-97]]:[[wallX,0,-97],[wallX,19.8,-97],[wallX,19.8,-3],[wallX,0,-3]];
+            building.interiorLamps.push({worldX:84-lampZ,points:lampPoints.map(worldPoint),wall:wall.map(worldPoint),lightOn:true,lightOpacity:.9,lightDelay:.08+(lampIndex%3)*.09,lightFlicker:lampIndex===2,lightOnset:-1});
           }
           function frameBox(x0,x1,y0,y1,z0,z1,stage,weight,solid){
             var points=[[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],[x0,y0,z0],[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1],[x0,y0,z1]];
@@ -1230,25 +1194,6 @@ function sampleCurve(controlPoints, samplesPerLeg) {
               panel([[x1,y0,z0],[x1,y0,z1],[x1,y1,z1],[x1,y1,z0]],stage,solid);
               panel([[x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1]],stage,solid);
             }
-          }
-          function machineBay(left,right,front,back,height,stage){
-            // Solid housings participate in depth: no far-side outlines visible through a machine.
-            panel([[left,.15,front],[right,.15,front],[right,height,front],[left,height,front]],stage,'#1c1c1c');
-            panel([[left,.15,back],[right,.15,back],[right,height,back],[left,height,back]],stage,'#161616');
-            panel([[left,.15,front],[left,.15,back],[left,height,back],[left,height,front]],stage,'#111111');
-            panel([[right,.15,front],[right,.15,back],[right,height,back],[right,height,front]],stage,'#171717');
-            panel([[left,height,front],[right,height,front],[right,height,back],[left,height,back]],stage,'#222222');
-            frameBox(left,right,.15,height,front,back,stage,.82);
-            panel([[left+.28,.45,front+.035],[right-.28,.45,front+.035],[right-.28,height-.35,front+.035],[left+.28,height-.35,front+.035]],stage,"rgb(24,24,24)");
-            var glassTop=height-1.05,glassBottom=Math.max(2.1,height*.48);
-            panel([[left+.72,glassBottom,front+.06],[right-1.25,glassBottom,front+.06],[right-1.25,glassTop,front+.06],[left+.72,glassTop,front+.06]],stage+.03,"rgb(44,44,44)");
-            line([[left+.72,glassBottom,front+.08],[right-1.25,glassBottom,front+.08],[right-1.25,glassTop,front+.08],[left+.72,glassTop,front+.08],[left+.72,glassBottom,front+.08]],stage+.04,.75,.9);
-            line([[left+(right-left)*.52,glassBottom,front+.09],[left+(right-left)*.52,glassTop,front+.09]],stage+.05,.52,.8);
-            for(var vent=0;vent<5;vent++)line([[left+.45,.9+vent*.35,front+.08],[left+1.05,.9+vent*.35,front+.08]],stage+.06,.44,.62);
-            frameBox(right+.18,right+1.2,.35,3.8,front-.5,front-2.1,stage+.07,.62);
-            panel([[right+.22,.42,front-.46],[right+1.16,.42,front-.46],[right+1.16,3.7,front-.46],[right+.22,3.7,front-.46]],stage+.07,"rgb(31,31,31)");
-            for(var button=0;button<3;button++)line([[right+.42+button*.22,3.25,front-.43],[right+.42+button*.22,3.42,front-.43]],stage+.08,.8,.9);
-            line([[left-.3,.18,front+.4],[right+.3,.18,front+.4],[right+.3,.18,back-.4],[left-.3,.18,back-.4],[left-.3,.18,front+.4]],stage,.46,.64);
           }
           function cncLathe(left,right,front,back,height,stage){
             // Enclosed turning centre: sliding window, spindle chuck, tool turret and controls.
@@ -1299,7 +1244,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
             for(var vent=0;vent<3;vent++)line([[left+.65+vent*.52,1.02,front+.09],[left+.65+vent*.52,1.32,front+.09]],stage+.06,.42);
           }
           // Large enclosed machine tools form clear production bays along both sides.
-          machineBay(-23,-16,-12,-28,6.8,.68);
+          cncLathe(-23,-16,-12,-28,6.8,.68);
           climateChamber(14,20,-13,-29,7,.69);
           cncLathe(-23,-16,-31,-46,7.2,.73);
           climateChamber(14,20,-73,-90,6.6,.91);
@@ -1336,9 +1281,8 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           }
           // Roller conveyor, motor housings and guarded transfer section, outside the cable lane.
           frameBox(8.2,17.6,.55,1.35,-52,-70,.88,.64,'#1a1a1a');
-          for(var rollerZ=-53;rollerZ>=-69;rollerZ-=1.25){
+          for(var rollerZ=-53;rollerZ>=-69;rollerZ-=2.5){
             line([[8.05,1.3,rollerZ],[17.75,1.3,rollerZ]],.9,.48);
-            line([[8.1,.35,rollerZ],[17.7,.35,rollerZ]],.9,.4);
           }
           frameBox(15.4,17.1,1.35,2.55,-56,-58,.94,.56,'#252525');
           ring(16.25,1.9,-57,.42,.95);
@@ -1491,7 +1435,7 @@ function sampleCurve(controlPoints, samplesPerLeg) {
           var power=factoryPower(lamp.worldX,0)*detailAmount(grow,.72);
           var light=windowLightAmount(lamp,power,lightNow,true);
           if(light<=0)return;
-          drawWindowLight(lamp.points,[255,226,181],light,true,lamp.ceiling);
+          drawWindowLight(lamp.points,[255,226,181],light,true,lamp.wall);
           strokePath3D(lamp.points.concat([lamp.points[0]]),rgb([255,246,224]),light*.6,.8);
         });
       }
